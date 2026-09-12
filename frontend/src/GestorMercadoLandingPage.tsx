@@ -88,7 +88,7 @@ export default function GestorMercadoLandingPage() {
 
     try {
       // Integração segura com FormSubmit via AJAX (Serverless / Sem servidor de email)
-      const targetEmail = import.meta.env.VITE_CONTACT_EMAIL || 'mercadobot.suporte@gmail.com';
+      const targetEmail = import.meta.env.VITE_CONTACT_EMAIL || 'mmbompreco33@gmail.com';
       const endpoint = `https://formsubmit.co/ajax/${targetEmail}`;
 
       const res = await fetch(endpoint, {

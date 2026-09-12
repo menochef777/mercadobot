@@ -85,7 +85,7 @@ export default function GestorMercadoLandingPage() {
     setContactSuccess(false);
 
     try {
-      const endpoint = `https://formsubmit.co/ajax/mercadobot.suporte@gmail.com`;
+      const endpoint = `https://formsubmit.co/ajax/mmbompreco33@gmail.com`;
       const res = await fetch(endpoint, {
         method: 'POST',
         headers: {
