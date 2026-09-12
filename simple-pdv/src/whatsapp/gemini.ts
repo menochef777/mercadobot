@@ -6,15 +6,6 @@ export interface ProdutoNotaFiscal {
   valorUnitario: number;
 }
 
-const MODELOS_GEMINI = [
-  'gemini-1.5-flash-latest',
-  'gemini-2.5-flash',
-  'gemini-2.0-flash',
-  'gemini-1.5-flash',
-  'gemini-1.5-pro-latest',
-  'gemini-1.5-pro',
-];
-
 export async function lerNotaFiscal(
   imagemBase64: string,
   mimeType: string = 'image/jpeg'
@@ -29,6 +20,7 @@ export async function lerNotaFiscal(
   const cleanBase64 = imagemBase64.replace(/^data:image\/[a-z0-9-+.]+;base64,/i, '');
 
   const genAI = new GoogleGenerativeAI(apiKey);
+  const model = genAI.getGenerativeModel({ model: 'gemini-2.0-flash' });
 
   const prompt =
     'Analise esta nota fiscal ou cupom fiscal brasileiro. Liste todos os produtos com: nome, quantidade e valor unitário. Responda APENAS em JSON array: [{"nome": "string", "quantidade": number, "valorUnitario": number}]. Não adicione texto extra nem explicações.';
@@ -40,42 +32,35 @@ export async function lerNotaFiscal(
     },
   };
 
-  let lastError: any = null;
+  try {
+    console.log('🤖 [Gemini] Processando imagem de nota fiscal com Gemini 2.0 Flash...');
+    const result = await model.generateContent([prompt, imagePart]);
+    const responseText = result.response.text().trim();
 
-  for (const modelName of MODELOS_GEMINI) {
-    try {
-      console.log(`🤖 [Gemini] Tentando modelo ${modelName}...`);
-      const model = genAI.getGenerativeModel({ model: modelName });
-      const result = await model.generateContent([prompt, imagePart]);
-      const responseText = result.response.text().trim();
+    console.log('🤖 [Gemini] Resposta recebida:', responseText);
 
-      console.log('🤖 [Gemini] Resposta recebida do modelo', modelName, ':', responseText);
+    // Limpa blocos de código markdown se existirem (```json ... ```)
+    const jsonCleaned = responseText
+      .replace(/^```json\s*/i, '')
+      .replace(/^```\s*/i, '')
+      .replace(/```\s*$/i, '')
+      .trim();
 
-      // Limpa blocos de código markdown se existirem (```json ... ```)
-      const jsonCleaned = responseText
-        .replace(/^```json\s*/i, '')
-        .replace(/^```\s*/i, '')
-        .replace(/```\s*$/i, '')
-        .trim();
+    const produtos = JSON.parse(jsonCleaned);
 
-      const produtos = JSON.parse(jsonCleaned);
-
-      if (!Array.isArray(produtos)) {
-        throw new Error('Formato retornado pelo Gemini não é uma lista de produtos.');
-      }
-
-      return produtos.map((item: any) => ({
-        nome: String(item.nome || item.name || 'Produto').trim(),
-        quantidade: Math.max(1, Number(item.quantidade || item.qtd || item.quantity || 1)),
-        valorUnitario: Number(item.valorUnitario || item.valor || item.unitPrice || item.preco || 0),
-      }));
-    } catch (error: any) {
-      console.warn(`⚠️ [Gemini] Falha ao tentar modelo ${modelName}:`, error.message);
-      lastError = error;
+    if (!Array.isArray(produtos)) {
+      throw new Error('Formato retornado pelo Gemini não é uma lista de produtos.');
     }
-  }
 
-  throw lastError || new Error('Nenhum modelo Gemini compatível respondeu com sucesso.');
+    return produtos.map((item: any) => ({
+      nome: String(item.nome || item.name || 'Produto').trim(),
+      quantidade: Math.max(1, Number(item.quantidade || item.qtd || item.quantity || 1)),
+      valorUnitario: Number(item.valorUnitario || item.valor || item.unitPrice || item.preco || 0),
+    }));
+  } catch (error: any) {
+    console.error('❌ [Gemini] Erro ao ler nota fiscal com Gemini 2.0 Flash:', error.message || error);
+    throw error;
+  }
 }
 
 export default {
