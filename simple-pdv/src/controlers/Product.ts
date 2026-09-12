@@ -66,25 +66,27 @@ class Product implements Controller {
 
     async delete(req: Request, res: Response): Promise<void> {
         try {
-            const { productId } = req.params
+            const { productId } = req.params;
             const data = await prisma.product.findUnique({
-                where: {
-                    productId: productId
-                }
-            })
-            if (data == null || data == undefined) {
-                res.status(404).json('product not find')
-            } else {
-                const product = await prisma.product.delete({
-                    where: {
-                        productId: productId
-                    }
-                })
-                res.status(200).json(product)
+                where: { productId }
+            });
+            if (!data) {
+                res.status(404).json({ error: 'Produto não encontrado.' });
+                return;
             }
+
+            // Remove itens associados antes de deletar o produto
+            await prisma.item.deleteMany({
+                where: { productId }
+            });
+
+            const product = await prisma.product.delete({
+                where: { productId }
+            });
+            res.status(200).json({ message: 'Produto excluído com sucesso.', product });
         } catch (error) {
-            console.log(error)
-            res.status(500)
+            console.error('Erro ao excluir produto:', error);
+            res.status(500).json({ error: 'Erro interno ao excluir produto.' });
         }
     }
 

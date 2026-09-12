@@ -341,6 +341,32 @@ export default function Dashboard() {
     }
   };
 
+  const handleExcluirProduto = async (productId: string, name: string) => {
+    if (!window.confirm(`Tem certeza que deseja excluir o produto "${name}" do estoque? Esta ação não pode ser desfeita.`)) {
+      return;
+    }
+    try {
+      setLoading(true);
+      const res = await fetch(`${API_BASE}/product/${productId}`, {
+        method: 'DELETE',
+      });
+
+      if (res.ok) {
+        showToast(`Produto "${name}" excluído do estoque com sucesso!`, 'success');
+        setReporModalOpen(false);
+        fetchEstoque();
+        fetchTodosProdutos();
+      } else {
+        const errData = await res.json().catch(() => ({}));
+        showToast(errData.error || 'Erro ao excluir produto.', 'error');
+      }
+    } catch (err) {
+      showToast('Erro de conexão ao excluir produto do estoque.', 'error');
+    } finally {
+      setLoading(false);
+    }
+  };
+
   const fetchFornecedores = async () => {
     try {
       setLoading(true);
@@ -1844,19 +1870,30 @@ export default function Dashboard() {
                             </p>
                           </div>
 
-                          {/* Botão Repor Estoque com Modal */}
-                          <button
-                            type="button"
-                            onClick={() => handleAbrirModalReposicao(item)}
-                            className={`w-full py-3.5 px-4 rounded-2xl font-['Cabin'] font-extrabold text-sm transition-all shadow-md active:scale-95 flex items-center justify-center gap-2 cursor-pointer ${
-                              isEsgotado
-                                ? 'bg-red-600 hover:bg-red-700 text-white shadow-red-600/20'
-                                : 'bg-amber-500 hover:bg-amber-600 text-slate-950 shadow-amber-500/20'
-                            }`}
-                          >
-                            <PlusIcon className="w-4 h-4 stroke-[3]" />
-                            Repor Estoque
-                          </button>
+                          {/* Botões de Ação no Alerta */}
+                          <div className="flex items-center gap-2">
+                            <button
+                              type="button"
+                              onClick={() => handleAbrirModalReposicao(item)}
+                              className={`flex-1 py-3 px-3 rounded-2xl font-['Cabin'] font-extrabold text-sm transition-all shadow-md active:scale-95 flex items-center justify-center gap-1.5 cursor-pointer ${
+                                isEsgotado
+                                  ? 'bg-red-600 hover:bg-red-700 text-white shadow-red-600/20'
+                                  : 'bg-amber-500 hover:bg-amber-600 text-slate-950 shadow-amber-500/20'
+                              }`}
+                            >
+                              <PlusIcon className="w-4 h-4 stroke-[3]" />
+                              Repor Estoque
+                            </button>
+
+                            <button
+                              type="button"
+                              onClick={() => handleExcluirProduto(item.productId, item.name)}
+                              title="Excluir Produto do Estoque"
+                              className="p-3 rounded-2xl bg-red-100 hover:bg-red-200 text-red-700 border border-red-300 transition-all active:scale-95 cursor-pointer"
+                            >
+                              <TrashIcon className="w-4 h-4" />
+                            </button>
+                          </div>
                         </div>
                       );
                     })}
@@ -1956,13 +1993,25 @@ export default function Dashboard() {
                               </div>
                             </div>
 
-                            <button
-                              type="button"
-                              onClick={() => handleAbrirModalReposicao(prod)}
-                              className="w-full py-2.5 px-3 rounded-xl bg-white/10 hover:bg-[#4ade80] hover:text-[#14532d] text-white text-xs font-bold font-['Cabin'] transition-all flex items-center justify-center gap-1.5 border border-white/10 active:scale-95 cursor-pointer shadow-sm"
-                            >
-                              ✏️ Atualizar Quantidade
-                            </button>
+                            <div className="flex items-center gap-2 mt-1">
+                              <button
+                                type="button"
+                                onClick={() => handleAbrirModalReposicao(prod)}
+                                className="flex-1 py-2 px-3 rounded-xl bg-white/10 hover:bg-[#4ade80] hover:text-[#14532d] text-white text-xs font-bold font-['Cabin'] transition-all flex items-center justify-center gap-1.5 border border-white/10 active:scale-95 cursor-pointer shadow-sm"
+                              >
+                                ✏️ Quantidade
+                              </button>
+
+                              <button
+                                type="button"
+                                onClick={() => handleExcluirProduto(prod.productId, prod.name)}
+                                title="Excluir produto permanentemente"
+                                className="py-2 px-3 rounded-xl bg-red-950/60 hover:bg-red-900 border border-red-500/30 hover:border-red-500/60 text-red-300 hover:text-white text-xs font-bold transition-all flex items-center justify-center gap-1 active:scale-95 cursor-pointer shadow-sm"
+                              >
+                                <TrashIcon className="w-3.5 h-3.5" />
+                                Excluir
+                              </button>
+                            </div>
                           </div>
                         );
                       })}
@@ -2070,21 +2119,32 @@ export default function Dashboard() {
                         />
                       </div>
 
-                      <div className="flex items-center justify-end gap-3 mt-2 pt-3 border-t border-white/10">
+                      <div className="flex items-center justify-between gap-3 mt-2 pt-3 border-t border-white/10 flex-wrap">
                         <button
                           type="button"
-                          onClick={() => setReporModalOpen(false)}
-                          className="px-4 py-2.5 rounded-xl bg-white/10 hover:bg-white/20 text-white text-xs font-semibold"
+                          onClick={() => handleExcluirProduto(reporItem.productId, reporItem.name)}
+                          className="px-3.5 py-2 rounded-xl bg-red-950/60 hover:bg-red-900 border border-red-500/40 text-red-300 hover:text-white text-xs font-bold transition-all flex items-center gap-1.5 active:scale-95 cursor-pointer"
                         >
-                          Cancelar
+                          <TrashIcon className="w-3.5 h-3.5" />
+                          Excluir do Estoque
                         </button>
-                        <button
-                          type="submit"
-                          disabled={reporLoading}
-                          className="px-6 py-2.5 rounded-xl bg-[#4ade80] text-[#14532d] font-['Cabin'] font-extrabold text-sm hover:bg-[#3ec972] transition-all shadow-lg active:scale-95 disabled:opacity-50 cursor-pointer"
-                        >
-                          {reporLoading ? 'Salvando...' : 'Confirmar Reposição'}
-                        </button>
+
+                        <div className="flex items-center gap-2">
+                          <button
+                            type="button"
+                            onClick={() => setReporModalOpen(false)}
+                            className="px-4 py-2.5 rounded-xl bg-white/10 hover:bg-white/20 text-white text-xs font-semibold cursor-pointer"
+                          >
+                            Cancelar
+                          </button>
+                          <button
+                            type="submit"
+                            disabled={reporLoading}
+                            className="px-6 py-2.5 rounded-xl bg-[#4ade80] text-[#14532d] font-['Cabin'] font-extrabold text-sm hover:bg-[#3ec972] transition-all shadow-lg active:scale-95 disabled:opacity-50 cursor-pointer"
+                          >
+                            {reporLoading ? 'Salvando...' : 'Confirmar Reposição'}
+                          </button>
+                        </div>
                       </div>
                     </form>
                   </div>
