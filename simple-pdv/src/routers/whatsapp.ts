@@ -474,27 +474,52 @@ app.post('/webhook', async (req: Request, res: Response): Promise<void> => {
       return;
     }
 
-    // 5. Comando de Ajuda / Menu Padrão
+    // 5. Comando de Ajuda / Menu Padrão / Saudações
     if (
       textLower === 'ajuda' ||
       textLower === 'menu' ||
       textLower === 'oi' ||
       textLower === 'olá' ||
-      textLower === 'ola'
+      textLower === 'ola' ||
+      textLower === 'bom dia' ||
+      textLower === 'boa tarde' ||
+      textLower === 'boa noite' ||
+      textLower === 'iniciar' ||
+      textLower === 'start' ||
+      textLower === 'comandos'
     ) {
-      const menu = `🤖 *GestorMercado Bot — Comandos Disponíveis:*\n\n` +
-        `• *caixa hoje* — Ver total de vendas e caixa do dia\n` +
-        `• *fiado [nome]* — Consultar fiados pendentes de um cliente\n` +
-        `• *estoque* — Ver produtos com estoque crítico\n` +
-        `• *Envie uma foto* de nota fiscal para confirmação de compras`;
+      const menu = `🤖 *miniMercado BomPreço*\n\n` +
+        `Olá Marcio e Ângelica! 👋 Estou pronto para ajudar a acompanhar o seu mercado.\n\n` +
+        `Você pode me pedir informações sobre:\n\n` +
+        `💰 *Vendas*\n` +
+        `Digite *caixa hoje* para ver quanto foi vendido hoje, número de vendas e o andamento do caixa.\n\n` +
+        `📦 *Estoque*\n` +
+        `Digite *estoque* para conferir os produtos que estão acabando ou que já estão em falta.\n\n` +
+        `📋 *Fiados*\n` +
+        `Digite *fiado [nome]* _(ex: fiado Seu Raimundo)_ para consultar o que um cliente está devendo e o total pendente.\n\n` +
+        `🧾 *Notas Fiscais*\n` +
+        `Envie uma foto da nota fiscal e eu identifico os produtos, atualizo o estoque e registro a compra automaticamente.`;
 
       await enviarMensagem(senderNumber, menu);
       res.status(200).json({ status: 'menu_sent' });
       return;
     }
 
-    // Mensagem não reconhecida
-    res.status(200).json({ status: 'unhandled_command' });
+    // Mensagem não reconhecida — responde com o menu de ajuda
+    const menuPadrao = `🤖 *miniMercado BomPreço*\n\n` +
+      `Olá Marcio e Ângelica! 👋 Estou pronto para ajudar a acompanhar o seu mercado.\n\n` +
+      `Você pode me pedir informações sobre:\n\n` +
+      `💰 *Vendas*\n` +
+      `Digite *caixa hoje* para ver quanto foi vendido hoje, número de vendas e o andamento do caixa.\n\n` +
+      `📦 *Estoque*\n` +
+      `Digite *estoque* para conferir os produtos que estão acabando ou que já estão em falta.\n\n` +
+      `📋 *Fiados*\n` +
+      `Digite *fiado [nome]* _(ex: fiado Seu Raimundo)_ para consultar o que um cliente está devendo e o total pendente.\n\n` +
+      `🧾 *Notas Fiscais*\n` +
+      `Envie uma foto da nota fiscal e eu identifico os produtos, atualizo o estoque e registro a compra automaticamente.`;
+
+    await enviarMensagem(senderNumber, menuPadrao);
+    res.status(200).json({ status: 'unhandled_command_menu_sent' });
   } catch (error: any) {
     console.error('❌ [Webhook WhatsApp] Erro ao processar webhook:', error);
     res.status(500).json({ error: 'Erro interno ao processar webhook do WhatsApp.' });
