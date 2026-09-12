@@ -198,15 +198,22 @@ class userController {
 
     loginUser = async (req: Request, res: Response): Promise<void> => {
         try {
-            const { email, password }: { email: string, password: string } = req.body;
+            const rawEmail = req.body.email || '';
+            const email = String(rawEmail).trim();
+            const password = req.body.password;
 
             if (!email || !password) {
                 res.status(400).json({ error: 'Email e senha são obrigatórios.' });
                 return;
             }
 
-            const user = await prisma.user.findUnique({
-                where: { email }
+            const user = await prisma.user.findFirst({
+                where: {
+                    OR: [
+                        { email: { equals: email, mode: 'insensitive' } },
+                        { userName: { equals: email, mode: 'insensitive' } },
+                    ]
+                }
             });
 
             if (!user) {

@@ -4,7 +4,7 @@ import { z } from 'zod';
 // AUTHENTICATION & USERS
 // ==========================================
 export const loginSchema = z.object({
-  email: z.string().email('Formato de e-mail inválido').min(1, 'E-mail é obrigatório'),
+  email: z.string().min(1, 'E-mail ou usuário é obrigatório').trim(),
   password: z.string().min(1, 'Senha é obrigatória'),
 });
 

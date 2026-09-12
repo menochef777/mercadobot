@@ -49,20 +49,60 @@ export async function bootstrapAdmin() {
       }
     }
 
-    // 4. Cria ou atualiza o usuário administrador customizável via variáveis de ambiente (.env)
-    const adminEmail = (process.env.ADMIN_EMAIL || 'admin@example.com').trim();
-    const adminPassword = process.env.ADMIN_PASSWORD || 'admin123';
-    const adminName = process.env.ADMIN_NAME || 'Administrador';
-    const adminUserName = process.env.ADMIN_USERNAME || 'admin';
+    // 4. Cria ou atualiza o usuário administrador configurado
+    const adminEmail = (process.env.ADMIN_EMAIL || 'mmbompreco33@gmail.com').trim().toLowerCase();
+    const adminPassword = (process.env.ADMIN_PASSWORD || 'bompreco').trim();
+    const adminName = process.env.ADMIN_NAME || 'MiniMercado BomPreço';
+    const adminUserName = (process.env.ADMIN_USERNAME || 'bompreco').trim().toLowerCase();
 
     const hashedPassword = bcrypt.hashSync(adminPassword, 10);
-    const adminUser = await prisma.user.upsert({
-      where: { email: adminEmail },
-      update: {
-        password: hashedPassword,
-        roleName: 'Admin',
+
+    // Verifica se já existe um usuário com este email
+    const existingByEmail = await prisma.user.findFirst({
+      where: { email: { equals: adminEmail, mode: 'insensitive' } },
+    });
+
+    if (existingByEmail) {
+      await prisma.user.update({
+        where: { userId: existingByEmail.userId },
+        data: {
+          password: hashedPassword,
+          name: adminName,
+          roleName: 'Admin',
+        },
+      });
+      console.log('✅ Usuário administrador atualizado com sucesso:', adminEmail);
+      return;
+    }
+
+    // Verifica se existe o antigo admin padrão (admin@example.com) para migrar
+    const defaultAdmin = await prisma.user.findFirst({
+      where: {
+        OR: [
+          { email: 'admin@example.com' },
+          { userName: 'admin' },
+        ],
       },
-      create: {
+    });
+
+    if (defaultAdmin) {
+      await prisma.user.update({
+        where: { userId: defaultAdmin.userId },
+        data: {
+          email: adminEmail,
+          userName: adminUserName,
+          name: adminName,
+          password: hashedPassword,
+          roleName: 'Admin',
+        },
+      });
+      console.log('✅ Usuário administrador padrão migrado para:', adminEmail);
+      return;
+    }
+
+    // Se nenhum existe, cria novo usuário garantindo CPF e username únicos
+    await prisma.user.create({
+      data: {
         name: adminName,
         email: adminEmail,
         password: hashedPassword,
@@ -72,8 +112,8 @@ export async function bootstrapAdmin() {
       },
     });
 
-    console.log('✅ Usuário administrador garantido no banco:', adminUser.email);
+    console.log('✅ Usuário administrador criado com sucesso no banco:', adminEmail);
   } catch (error) {
-    console.warn('Aviso: Não foi possível verificar/criar admin no bootstrap (banco pode estar inicializando):', error);
+    console.error('❌ Erro no bootstrap de admin:', error);
   }
 }
