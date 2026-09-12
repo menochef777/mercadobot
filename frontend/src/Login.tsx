@@ -41,11 +41,16 @@ export default function Login({ onLoginSuccess }: LoginProps) {
       });
 
       if (!res.ok) {
-        if (res.status === 401) {
-          setError('Email ou senha inválidos. Verifique as credenciais.');
-        } else {
-          setError('Erro ao autenticar. Tente novamente.');
-        }
+        let msg = 'Erro ao autenticar. Tente novamente.';
+        try {
+          const errText = await res.text();
+          if (errText) {
+            msg = errText.includes('password') || errText.includes('found') || res.status === 401
+              ? 'Email ou senha incorretos. Verifique as credenciais.'
+              : errText;
+          }
+        } catch (e) {}
+        setError(msg);
         setLoading(false);
         return;
       }

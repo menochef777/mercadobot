@@ -5,10 +5,13 @@ const jwt = require('jsonwebtoken');
 
 const prisma = new PrismaClient();
 
+const JWT_SECRET = process.env.JWT_SECRET || '3f8b9c2a4d6e7f1a2b3c4d5e6f7g8h9i';
+const REFRESH_JWT_SECRET = process.env.REFRESH_JWT_SECRET || '9h8g7f6e5d4c3b2a1f0e9d8c7b6a5f4g';
+
 class userController {
     generateTokens = (userId: string): { accessToken: string, refreshToken: string } => {
-        const accessToken = jwt.sign({ userId }, process.env.JWT_SECRET as string, { expiresIn: '15m' });
-        const refreshToken = jwt.sign({ userId }, process.env.REFRESH_JWT_SECRET as string, { expiresIn: '7d' });
+        const accessToken = jwt.sign({ userId }, JWT_SECRET, { expiresIn: '15m' });
+        const refreshToken = jwt.sign({ userId }, REFRESH_JWT_SECRET, { expiresIn: '7d' });
         return { accessToken, refreshToken };
     }
 
