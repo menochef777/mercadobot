@@ -6,6 +6,9 @@ import { lerNotaFiscal } from '../whatsapp/gemini';
 const prisma = new PrismaClient();
 const app = Router();
 
+// Cache em memória para evitar reprocessamento em loop da mesma mensagem
+const processedMessages = new Set<string>();
+
 /**
  * Função utilitária para extrair base64 de imagens recebidas do OpenWA
  */
@@ -95,10 +98,45 @@ app.post('/webhook', async (req: Request, res: Response): Promise<void> => {
     // Suporta diferentes estruturas de payload do OpenWA (wppconnect, whatsapp-web.js, openwa standard)
     const messageData = payload.data || payload.message || payload;
 
+    // Ignora eventos que não sejam mensagens ou que sejam status broadcast
+    const eventType = String(payload.event || payload.type || '');
+    if (eventType.includes('ack') || eventType.includes('revoke') || eventType.includes('presence')) {
+      res.status(200).json({ status: 'ignored_event_type' });
+      return;
+    }
+
     // Ignora mensagens enviadas pelo próprio bot para evitar loops
-    if (messageData.fromMe || payload.fromMe) {
+    const isFromMe =
+      Boolean(messageData.fromMe) ||
+      Boolean(payload.fromMe) ||
+      Boolean(payload.data?.fromMe) ||
+      Boolean(messageData.id?.fromMe) ||
+      Boolean(messageData.key?.fromMe) ||
+      Boolean(payload.data?.key?.fromMe);
+
+    if (isFromMe) {
       res.status(200).json({ status: 'ignored_from_me' });
       return;
+    }
+
+    // Deduplicação: ignora se a mesma mensagem já foi processada
+    const msgId = String(
+      messageData.id?._serialized ||
+      messageData.id ||
+      payload.data?.id ||
+      payload.id ||
+      ''
+    );
+    if (msgId) {
+      if (processedMessages.has(msgId)) {
+        res.status(200).json({ status: 'duplicate_ignored' });
+        return;
+      }
+      processedMessages.add(msgId);
+      if (processedMessages.size > 2000) {
+        const first = processedMessages.values().next().value;
+        if (first) processedMessages.delete(first);
+      }
     }
 
     // Extrai o remetente (chatId / JID de onde veio a mensagem)
