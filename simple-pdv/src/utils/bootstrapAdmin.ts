@@ -49,18 +49,24 @@ export async function bootstrapAdmin() {
       }
     }
 
-    // 4. Cria ou atualiza o usuário administrador padrão
-    const hashedPassword = bcrypt.hashSync('admin123', 10);
+    // 4. Cria ou atualiza o usuário administrador customizável via variáveis de ambiente (.env)
+    const adminEmail = (process.env.ADMIN_EMAIL || 'admin@example.com').trim();
+    const adminPassword = process.env.ADMIN_PASSWORD || 'admin123';
+    const adminName = process.env.ADMIN_NAME || 'Administrador';
+    const adminUserName = process.env.ADMIN_USERNAME || 'admin';
+
+    const hashedPassword = bcrypt.hashSync(adminPassword, 10);
     const adminUser = await prisma.user.upsert({
-      where: { email: 'admin@example.com' },
+      where: { email: adminEmail },
       update: {
         password: hashedPassword,
+        roleName: 'Admin',
       },
       create: {
-        name: 'Administrator',
-        email: 'admin@example.com',
+        name: adminName,
+        email: adminEmail,
         password: hashedPassword,
-        userName: 'admin',
+        userName: adminUserName,
         cpf: '00000000000',
         roleName: 'Admin',
       },
