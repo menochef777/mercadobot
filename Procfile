@@ -1,1 +1,1 @@
-web: npx prisma migrate deploy && npm start
+web: cd simple-pdv && npx prisma migrate deploy && npm start
