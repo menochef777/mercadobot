@@ -34,8 +34,8 @@ export async function lerNotaFiscal(
 
   const genAI = new GoogleGenerativeAI(apiKey);
 
-  const prompt = `Analise esta nota fiscal brasileira. Extraia:
-1. Lista de produtos com nome, quantidade e valorUnitario
+  const prompt = `Analise esta nota fiscal ou cupom fiscal brasileiro. Extraia:
+1. Lista de produtos com nome, quantidade e valorUnitario. IGNORE itens como: frete, desconto, taxa, entrega, embalagem, brinde. Liste APENAS produtos físicos vendáveis.
 2. valorTotal da nota
 3. dataVencimento se existir (formato DD/MM/YYYY)
 4. nomeFornecedor se aparecer

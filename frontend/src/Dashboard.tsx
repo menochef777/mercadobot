@@ -136,6 +136,19 @@ interface AlertaEstoque {
   price: number;
 }
 
+interface ProductItem {
+  productId: string;
+  name: string;
+  barcode?: string;
+  sku?: string;
+  price: number;
+  costPrice?: number;
+  quantidadeAtual: number;
+  quantidadeMinima: number;
+  stockQuantity?: number;
+  description?: string;
+}
+
 interface Fornecedor {
   id: string;
   nome: string;
@@ -171,11 +184,20 @@ export default function Dashboard() {
   // Data State
   const [fiados, setFiados] = useState<Fiado[]>([]);
   const [alertasEstoque, setAlertasEstoque] = useState<AlertaEstoque[]>([]);
+  const [todosProdutos, setTodosProdutos] = useState<ProductItem[]>([]);
+  const [searchProduto, setSearchProduto] = useState('');
   const [fornecedores, setFornecedores] = useState<Fornecedor[]>([]);
   const [vendasHoje, setVendasHoje] = useState<Venda[]>([]);
   const [totalCaixaHoje, setTotalCaixaHoje] = useState(0);
   const [loading, setLoading] = useState(false);
   const [message, setMessage] = useState<{ text: string; type: 'success' | 'error' } | null>(null);
+
+  // Modal de Reposição / Atualização de Estoque
+  const [reporModalOpen, setReporModalOpen] = useState(false);
+  const [reporItem, setReporItem] = useState<{ productId: string; name: string; quantidadeAtual: number; quantidadeMinima: number; price?: number } | null>(null);
+  const [reporQtd, setReporQtd] = useState<number>(10);
+  const [reporModo, setReporModo] = useState<'adicionar' | 'definir'>('adicionar');
+  const [reporLoading, setReporLoading] = useState(false);
 
   // PDV / Carrinho State
   const [barcodeInput, setBarcodeInput] = useState('');
@@ -251,6 +273,56 @@ export default function Dashboard() {
     }
   };
 
+  const fetchTodosProdutos = async () => {
+    try {
+      const res = await fetch(`${API_BASE}/product`);
+      if (res.ok) {
+        const data = await res.json();
+        setTodosProdutos(Array.isArray(data) ? data : []);
+      }
+    } catch (err) {
+      console.error('Erro ao buscar todos os produtos:', err);
+    }
+  };
+
+  const handleAbrirModalReposicao = (item: { productId: string; name: string; quantidadeAtual: number; quantidadeMinima: number; price?: number }) => {
+    setReporItem(item);
+    setReporQtd(10);
+    setReporModo('adicionar');
+    setReporModalOpen(true);
+  };
+
+  const handleSalvarReposicao = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!reporItem) return;
+    try {
+      setReporLoading(true);
+      const payload = reporModo === 'adicionar'
+        ? { adicionar: Number(reporQtd) }
+        : { quantidadeAtual: Number(reporQtd) };
+
+      const res = await fetch(`${API_BASE}/estoque/${reporItem.productId}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload),
+      });
+
+      if (res.ok) {
+        showToast(`Estoque de "${reporItem.name}" atualizado com sucesso!`, 'success');
+        setReporModalOpen(false);
+        fetchEstoque();
+        fetchTodosProdutos();
+      } else {
+        const errData = await res.json().catch(() => ({}));
+        showToast(errData.error || 'Erro ao atualizar estoque.', 'error');
+      }
+    } catch (err) {
+      showToast('Erro de conexão ao atualizar estoque.', 'error');
+    } finally {
+      setReporLoading(false);
+    }
+  };
+
   const fetchFornecedores = async () => {
     try {
       setLoading(true);
@@ -281,7 +353,10 @@ export default function Dashboard() {
 
   useEffect(() => {
     if (activeTab === 'fiado') fetchFiados();
-    if (activeTab === 'estoque') fetchEstoque();
+    if (activeTab === 'estoque') {
+      fetchEstoque();
+      fetchTodosProdutos();
+    }
     if (activeTab === 'fornecedores') fetchFornecedores();
     if (activeTab === 'caixa') fetchVendasHoje();
   }, [activeTab]);
@@ -1514,70 +1589,366 @@ export default function Dashboard() {
           {/* ABA 3: ESTOQUE & ALERTAS */}
           {/* ================================================================= */}
           {activeTab === 'estoque' && (
-            <div className="flex flex-col gap-6">
-              <div>
-                <h3 className="font-['Manrope'] font-bold text-xl text-white">
-                  Alertas de Reposição de Estoque
-                </h3>
-                <p className="text-xs text-neutral-400 mt-1">
-                  Produtos que atingiram ou estão abaixo da quantidade mínima configurada
-                </p>
+            <div className="flex flex-col gap-10">
+              
+              {/* SEÇÃO 1: ALERTAS DE REPOSIÇÃO */}
+              <div className="flex flex-col gap-5">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-2 border-b border-white/10">
+                  <div>
+                    <h3 className="font-['Manrope'] font-extrabold text-2xl text-white flex items-center gap-2.5">
+                      <span className="p-2 rounded-xl bg-amber-500/20 text-amber-400 border border-amber-500/30">
+                        ⚠️
+                      </span>
+                      Alertas de Reposição de Estoque
+                    </h3>
+                    <p className="text-xs text-neutral-400 mt-1">
+                      Produtos que atingiram ou estão abaixo da quantidade mínima configurada no mercadinho
+                    </p>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <span className="px-3.5 py-1.5 rounded-full text-xs font-bold bg-red-500/20 text-red-300 border border-red-500/40">
+                      {alertasEstoque.filter(a => (a.quantidadeAtual ?? 0) <= 0).length} Esgotados
+                    </span>
+                    <span className="px-3.5 py-1.5 rounded-full text-xs font-bold bg-amber-500/20 text-amber-300 border border-amber-500/40">
+                      {alertasEstoque.filter(a => (a.quantidadeAtual ?? 0) > 0).length} Estoque Baixo
+                    </span>
+                  </div>
+                </div>
+
+                {loading && alertasEstoque.length === 0 ? (
+                  <div className="py-16 text-center text-neutral-400 text-sm flex flex-col items-center gap-3">
+                    <div className="w-8 h-8 border-3 border-[#4ade80] border-t-transparent rounded-full animate-spin" />
+                    <span>Carregando alertas de estoque...</span>
+                  </div>
+                ) : alertasEstoque.length === 0 ? (
+                  <div className="p-10 rounded-3xl bg-emerald-950/30 border border-emerald-500/30 text-center flex flex-col items-center gap-2 shadow-xl">
+                    <span className="text-4xl">🎉</span>
+                    <h4 className="text-lg font-bold text-emerald-300 font-['Manrope']">
+                      Estoque em dia!
+                    </h4>
+                    <p className="text-xs text-emerald-400/80">
+                      Nenhum produto está abaixo da quantidade mínima no momento.
+                    </p>
+                  </div>
+                ) : (
+                  /* Grid Responsivo de Alertas: 1 Coluna Mobile, 2 Tablet, 3 Desktop */
+                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                    {alertasEstoque.map((item) => {
+                      const isEsgotado = (item.quantidadeAtual ?? 0) <= 0;
+                      return (
+                        <div
+                          key={item.productId}
+                          className={`p-6 rounded-3xl bg-white text-slate-900 border-2 flex flex-col justify-between gap-5 transition-all duration-200 hover:shadow-2xl hover:-translate-y-1 shadow-lg ${
+                            isEsgotado
+                              ? 'border-red-500 shadow-red-500/10'
+                              : 'border-amber-400 shadow-amber-500/10'
+                          }`}
+                        >
+                          <div className="flex flex-col gap-3">
+                            {/* Badge Colorido Superior */}
+                            <div className="flex items-center justify-between gap-2">
+                              <span
+                                className={`px-3 py-1 rounded-full text-xs font-black tracking-wider uppercase flex items-center gap-1.5 ${
+                                  isEsgotado
+                                    ? 'bg-red-100 text-red-700 border border-red-300'
+                                    : 'bg-amber-100 text-amber-800 border border-amber-300'
+                                }`}
+                              >
+                                {isEsgotado ? '🚨 ESGOTADO' : '⚠️ ESTOQUE BAIXO'}
+                              </span>
+
+                              {item.barcode && (
+                                <span className="text-[11px] font-mono text-slate-600 font-medium">
+                                  #{item.barcode}
+                                </span>
+                              )}
+                            </div>
+
+                            {/* Nome do Produto em Destaque */}
+                            <div>
+                              <h4 className="font-['Manrope'] font-extrabold text-xl text-slate-900 leading-snug line-clamp-2">
+                                {item.name}
+                              </h4>
+                            </div>
+
+                            {/* Box Estoque Atual vs Mínimo ('5 / 10 un') */}
+                            <div className="p-4 rounded-2xl bg-slate-50 border border-slate-200 flex items-center justify-between">
+                              <div>
+                                <span className="text-xs font-semibold text-slate-600 block">
+                                  Estoque / Mínimo:
+                                </span>
+                                <div className="text-2xl font-black font-mono mt-0.5">
+                                  <span className={isEsgotado ? 'text-red-600' : 'text-amber-600'}>
+                                    {item.quantidadeAtual}
+                                  </span>
+                                  <span className="text-slate-600 font-semibold text-lg">
+                                    {' '}/ {item.quantidadeMinima} un
+                                  </span>
+                                </div>
+                              </div>
+
+                              <div className="text-right">
+                                <span className="text-xs font-semibold text-slate-600 block">
+                                  Preço de Venda:
+                                </span>
+                                <span className="text-base font-extrabold text-emerald-700 font-['Manrope']">
+                                  R$ {Number(item.price || 0).toFixed(2)}
+                                </span>
+                              </div>
+                            </div>
+
+                            <p className="text-xs text-slate-700 font-medium">
+                              Déficit para repor:{' '}
+                              <strong className="text-slate-900 font-bold">
+                                {item.deficit || Math.max(0, item.quantidadeMinima - item.quantidadeAtual)} unidades
+                              </strong>
+                            </p>
+                          </div>
+
+                          {/* Botão Repor Estoque com Modal */}
+                          <button
+                            type="button"
+                            onClick={() => handleAbrirModalReposicao(item)}
+                            className={`w-full py-3.5 px-4 rounded-2xl font-['Cabin'] font-extrabold text-sm transition-all shadow-md active:scale-95 flex items-center justify-center gap-2 cursor-pointer ${
+                              isEsgotado
+                                ? 'bg-red-600 hover:bg-red-700 text-white shadow-red-600/20'
+                                : 'bg-amber-500 hover:bg-amber-600 text-slate-950 shadow-amber-500/20'
+                            }`}
+                          >
+                            <PlusIcon className="w-4 h-4 stroke-[3]" />
+                            Repor Estoque
+                          </button>
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
               </div>
 
-              {loading && alertasEstoque.length === 0 ? (
-                <div className="py-12 text-center text-neutral-500 text-sm">Carregando estoque...</div>
-              ) : alertasEstoque.length === 0 ? (
-                <div className="p-8 rounded-2xl bg-white/[0.02] border border-white/10 text-center text-emerald-400">
-                  🎉 Nenhum produto com estoque crítico no momento!
+              {/* SEÇÃO 2: TODOS OS PRODUTOS */}
+              <div className="flex flex-col gap-5 pt-6 border-t border-white/10">
+                <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+                  <div>
+                    <h3 className="font-['Manrope'] font-extrabold text-2xl text-white flex items-center gap-2.5">
+                      <span className="p-2 rounded-xl bg-emerald-500/20 text-[#4ade80] border border-emerald-500/30">
+                        📦
+                      </span>
+                      Todos os Produtos ({todosProdutos.length})
+                    </h3>
+                    <p className="text-xs text-neutral-400 mt-1">
+                      Catálogo completo com controle de quantidade atual, estoque mínimo e preços
+                    </p>
+                  </div>
+
+                  {/* Campo de Busca Rápida */}
+                  <div className="w-full md:w-80">
+                    <input
+                      type="text"
+                      placeholder="🔍 Buscar produto por nome ou código..."
+                      value={searchProduto}
+                      onChange={(e) => setSearchProduto(e.target.value)}
+                      className="w-full px-4 py-2.5 rounded-xl bg-black/60 border border-white/15 text-white placeholder:text-neutral-500 text-sm focus:outline-none focus:border-[#4ade80] transition-colors"
+                    />
+                  </div>
                 </div>
-              ) : (
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                  {alertasEstoque.map((item) => (
-                    <div
-                      key={item.productId}
-                      className="p-5 rounded-2xl bg-white/[0.03] border border-white/10 flex flex-col justify-between gap-4"
-                    >
-                      <div className="flex flex-col gap-2">
-                        <div className="flex items-start justify-between">
-                          <h4 className="font-['Manrope'] font-bold text-base text-white">
-                            {item.name}
-                          </h4>
-                          <span className={`text-[11px] font-bold px-2.5 py-1 rounded-full border ${
-                            item.statusEstoque === 'ESGOTADO'
-                              ? 'bg-red-950 text-red-300 border-red-500/50'
-                              : 'bg-amber-950 text-amber-300 border-amber-500/50'
-                          }`}>
-                            {item.statusEstoque}
-                          </span>
-                        </div>
 
-                        <div className="grid grid-cols-2 gap-2 mt-2 text-xs">
-                          <div className="p-2.5 rounded-xl bg-black/40 border border-white/5">
-                            <span className="text-neutral-400 block text-[11px]">Estoque Atual:</span>
-                            <strong className={`text-base font-bold ${item.quantidadeAtual <= 0 ? 'text-red-400' : 'text-amber-400'}`}>
-                              {item.quantidadeAtual} un
-                            </strong>
+                {todosProdutos.length === 0 ? (
+                  <div className="py-12 text-center text-neutral-500 text-sm">
+                    Nenhum produto cadastrado no momento.
+                  </div>
+                ) : (
+                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                    {todosProdutos
+                      .filter((p) =>
+                        p.name.toLowerCase().includes(searchProduto.toLowerCase()) ||
+                        (p.barcode && p.barcode.includes(searchProduto))
+                      )
+                      .map((prod) => {
+                        const qtdAtual = prod.quantidadeAtual ?? 0;
+                        const qtdMin = prod.quantidadeMinima ?? 5;
+                        const isEsgotado = qtdAtual <= 0;
+                        const isBaixo = qtdAtual <= qtdMin && !isEsgotado;
+
+                        return (
+                          <div
+                            key={prod.productId}
+                            className="p-5 rounded-2xl bg-white/[0.04] border border-white/10 hover:border-white/20 backdrop-blur-xl flex flex-col justify-between gap-4 transition-all shadow-md"
+                          >
+                            <div className="flex flex-col gap-2">
+                              <div className="flex items-start justify-between gap-2">
+                                <h4 className="font-['Manrope'] font-bold text-base text-white line-clamp-1">
+                                  {prod.name}
+                                </h4>
+                                <span
+                                  className={`text-[10px] font-bold px-2 py-0.5 rounded-md border shrink-0 ${
+                                    isEsgotado
+                                      ? 'bg-red-950/80 text-red-300 border-red-500/40'
+                                      : isBaixo
+                                      ? 'bg-amber-950/80 text-amber-300 border-amber-500/40'
+                                      : 'bg-emerald-950/80 text-emerald-300 border-emerald-500/40'
+                                  }`}
+                                >
+                                  {isEsgotado ? 'Esgotado' : isBaixo ? 'Baixo' : 'OK'}
+                                </span>
+                              </div>
+
+                              {prod.barcode && (
+                                <span className="text-xs font-mono text-neutral-500">
+                                  #{prod.barcode}
+                                </span>
+                              )}
+
+                              <div className="grid grid-cols-2 gap-2 mt-1 text-xs">
+                                <div className="p-2.5 rounded-xl bg-black/40 border border-white/5">
+                                  <span className="text-neutral-400 block text-[11px]">Estoque / Mínimo:</span>
+                                  <strong className={`text-sm font-bold font-mono ${
+                                    isEsgotado ? 'text-red-400' : isBaixo ? 'text-amber-400' : 'text-white'
+                                  }`}>
+                                    {qtdAtual} / {qtdMin} un
+                                  </strong>
+                                </div>
+
+                                <div className="p-2.5 rounded-xl bg-black/40 border border-white/5">
+                                  <span className="text-neutral-400 block text-[11px]">Preço de Venda:</span>
+                                  <strong className="text-sm font-bold text-[#4ade80] font-['Manrope']">
+                                    R$ {Number(prod.price || 0).toFixed(2)}
+                                  </strong>
+                                </div>
+                              </div>
+                            </div>
+
+                            <button
+                              type="button"
+                              onClick={() => handleAbrirModalReposicao(prod)}
+                              className="w-full py-2.5 px-3 rounded-xl bg-white/10 hover:bg-[#4ade80] hover:text-[#14532d] text-white text-xs font-bold font-['Cabin'] transition-all flex items-center justify-center gap-1.5 border border-white/10 active:scale-95 cursor-pointer shadow-sm"
+                            >
+                              ✏️ Atualizar Quantidade
+                            </button>
                           </div>
+                        );
+                      })}
+                  </div>
+                )}
+              </div>
 
-                          <div className="p-2.5 rounded-xl bg-black/40 border border-white/5">
-                            <span className="text-neutral-400 block text-[11px]">Qtd Mínima:</span>
-                            <strong className="text-base font-bold text-neutral-200">
-                              {item.quantidadeMinima} un
-                            </strong>
-                          </div>
-                        </div>
-
-                        <p className="text-xs text-neutral-400 mt-1">
-                          Déficit para repor: <strong className="text-white">{item.deficit} unidades</strong>
+              {/* MODAL DE REPOSIÇÃO / ATUALIZAÇÃO DE ESTOQUE */}
+              {reporModalOpen && reporItem && (
+                <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-md flex items-center justify-center p-4">
+                  <div className="max-w-md w-full p-6 rounded-3xl bg-neutral-900 border border-white/20 shadow-2xl flex flex-col gap-5 text-white animate-in fade-in zoom-in-95 duration-150">
+                    <div className="flex items-center justify-between border-b border-white/10 pb-3">
+                      <div>
+                        <h3 className="font-['Manrope'] font-bold text-lg text-white">
+                          Repor / Ajustar Estoque
+                        </h3>
+                        <p className="text-xs text-neutral-400 mt-0.5 truncate max-w-[280px]">
+                          {reporItem.name}
                         </p>
                       </div>
-
-                      <div className="pt-3 border-t border-white/5 flex items-center justify-between text-xs">
-                        <span className="text-neutral-400">Preço de Venda:</span>
-                        <strong className="text-white font-['Manrope']">R$ {item.price.toFixed(2)}</strong>
-                      </div>
+                      <button
+                        type="button"
+                        onClick={() => setReporModalOpen(false)}
+                        className="text-neutral-400 hover:text-white text-base p-1"
+                      >
+                        ✕
+                      </button>
                     </div>
-                  ))}
+
+                    <form onSubmit={handleSalvarReposicao} className="flex flex-col gap-4">
+                      <div className="p-3.5 rounded-2xl bg-black/50 border border-white/10 flex items-center justify-between text-xs">
+                        <span className="text-neutral-400">Estoque Atual:</span>
+                        <span className="font-mono text-base font-bold text-[#4ade80]">
+                          {reporItem.quantidadeAtual} un
+                        </span>
+                      </div>
+
+                      {/* Modo de Reposição: Adicionar ou Definir Fixo */}
+                      <div>
+                        <label className="block text-xs font-semibold text-neutral-300 mb-1.5">
+                          Tipo de Ajuste:
+                        </label>
+                        <div className="grid grid-cols-2 gap-2">
+                          <button
+                            type="button"
+                            onClick={() => setReporModo('adicionar')}
+                            className={`py-2.5 px-3 rounded-xl text-xs font-bold transition-all border ${
+                              reporModo === 'adicionar'
+                                ? 'bg-[#4ade80] text-[#14532d] border-[#4ade80]'
+                                : 'bg-white/5 text-neutral-300 border-white/10 hover:bg-white/10'
+                            }`}
+                          >
+                            ➕ Adicionar (+ un)
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => setReporModo('definir')}
+                            className={`py-2.5 px-3 rounded-xl text-xs font-bold transition-all border ${
+                              reporModo === 'definir'
+                                ? 'bg-[#4ade80] text-[#14532d] border-[#4ade80]'
+                                : 'bg-white/5 text-neutral-300 border-white/10 hover:bg-white/10'
+                            }`}
+                          >
+                            ✏️ Nova Qtd Fixa
+                          </button>
+                        </div>
+                      </div>
+
+                      {/* Atalhos Rápidos para Adicionar */}
+                      {reporModo === 'adicionar' && (
+                        <div>
+                          <label className="block text-xs font-semibold text-neutral-400 mb-1">
+                            Atalhos Rápidos (+):
+                          </label>
+                          <div className="flex flex-wrap gap-2">
+                            {[5, 10, 20, 50, 100].map((qtd) => (
+                              <button
+                                key={qtd}
+                                type="button"
+                                onClick={() => setReporQtd(qtd)}
+                                className={`px-3 py-1.5 rounded-lg text-xs font-bold font-mono transition-colors border ${
+                                  reporQtd === qtd
+                                    ? 'bg-[#14532d] text-[#4ade80] border-[#4ade80]'
+                                    : 'bg-white/5 text-neutral-300 border-white/10 hover:bg-white/10'
+                                }`}
+                              >
+                                +{qtd}
+                              </button>
+                            ))}
+                          </div>
+                        </div>
+                      )}
+
+                      <div>
+                        <label className="block text-xs font-semibold text-neutral-300 mb-1.5">
+                          {reporModo === 'adicionar' ? 'Quantidade a Adicionar:' : 'Nova Quantidade em Estoque:'}
+                        </label>
+                        <input
+                          type="number"
+                          min="0"
+                          required
+                          value={reporQtd}
+                          onChange={(e) => setReporQtd(Number(e.target.value))}
+                          className="w-full px-4 py-3 rounded-xl bg-black/60 border border-white/20 text-white font-mono text-lg font-bold focus:outline-none focus:border-[#4ade80]"
+                        />
+                      </div>
+
+                      <div className="flex items-center justify-end gap-3 mt-2 pt-3 border-t border-white/10">
+                        <button
+                          type="button"
+                          onClick={() => setReporModalOpen(false)}
+                          className="px-4 py-2.5 rounded-xl bg-white/10 hover:bg-white/20 text-white text-xs font-semibold"
+                        >
+                          Cancelar
+                        </button>
+                        <button
+                          type="submit"
+                          disabled={reporLoading}
+                          className="px-6 py-2.5 rounded-xl bg-[#4ade80] text-[#14532d] font-['Cabin'] font-extrabold text-sm hover:bg-[#3ec972] transition-all shadow-lg active:scale-95 disabled:opacity-50 cursor-pointer"
+                        >
+                          {reporLoading ? 'Salvando...' : 'Confirmar Reposição'}
+                        </button>
+                      </div>
+                    </form>
+                  </div>
                 </div>
               )}
             </div>
