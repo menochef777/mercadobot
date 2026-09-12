@@ -4,9 +4,9 @@
   "private": true,
   "description": "MercadoBot / GestorMercado Monorepo",
   "scripts": {
-    "postinstall": "cd simple-pdv && npm install",
-    "build": "cd simple-pdv && npx prisma generate && npm run build",
-    "start": "cd simple-pdv && npm start"
+    "postinstall": "sh -c 'if [ -d simple-pdv ]; then cd simple-pdv && npm install; fi'",
+    "build": "sh -c 'if [ -d simple-pdv ]; then cd simple-pdv && npx prisma generate && npm run build; else npx prisma generate && npm run build; fi'",
+    "start": "sh -c 'if [ -d simple-pdv ]; then cd simple-pdv && npm start; else npm start; fi'"
   },
   "dependencies": {
     "@prisma/client": "^5.15.0"

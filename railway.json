@@ -2,10 +2,10 @@
   "$schema": "https://railway.com/railway.schema.json",
   "build": {
     "builder": "NIXPACKS",
-    "buildCommand": "cd simple-pdv && npm install && npm run build"
+    "buildCommand": "sh -c 'if [ -d simple-pdv ]; then cd simple-pdv; fi; npm install && npm run build'"
   },
   "deploy": {
-    "startCommand": "cd simple-pdv && npx prisma db push && npm start",
+    "startCommand": "sh -c 'if [ -d simple-pdv ]; then cd simple-pdv; fi; npx prisma db push && npm start'",
     "restartPolicyType": "ON_FAILURE",
     "restartPolicyMaxRetries": 10
   }
