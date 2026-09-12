@@ -3,6 +3,15 @@ import https from 'https';
 import fs from 'fs';
 import { initRelatorioJob } from './jobs/relatorio';
 
+console.log('DB:', process.env.DATABASE_URL ? 'conectado' : 'FALTANDO');
+
+process.on('uncaughtException', (err) => {
+  console.error('Uncaught Exception:', err);
+});
+process.on('unhandledRejection', (reason) => {
+  console.error('Unhandled Rejection:', reason);
+});
+
 const PORT = process.env.PORT || 3000;
 const keyPath = 'cert/localhost+2-key.pem';
 const certPath = 'cert/localhost+2.pem';
