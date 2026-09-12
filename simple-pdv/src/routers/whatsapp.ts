@@ -2,6 +2,7 @@ import { Router, Request, Response } from 'express';
 import { PrismaClient } from '@prisma/client';
 import { enviarMensagem, formatarNumeroWhatsApp } from '../whatsapp/openwa';
 import { lerNotaFiscal } from '../whatsapp/gemini';
+import { criarEventoVencimento } from '../services/calendar';
 
 const prisma = new PrismaClient();
 const app = Router();
@@ -269,12 +270,13 @@ app.post('/webhook', async (req: Request, res: Response): Promise<void> => {
             ? dadosNota.valorTotal
             : produtosAtualizados.reduce((acc, p) => acc + p.qtd * p.valorUnitario, 0);
 
-        // Se vier dataVencimento, salva a conta a pagar no banco
+        // Se vier dataVencimento, salva a conta a pagar no banco e cria evento no Google Calendar
         if (dadosNota.dataVencimento) {
+          const nomeFornecedorFinal = dadosNota.nomeFornecedor || 'Fornecedor da Nota';
           try {
             await prisma.contaPagar.create({
               data: {
-                nomeFornecedor: dadosNota.nomeFornecedor || 'Fornecedor da Nota',
+                nomeFornecedor: nomeFornecedorFinal,
                 valor: totalNota,
                 dataVencimento: dadosNota.dataVencimento,
                 status: 'PENDENTE',
@@ -283,6 +285,13 @@ app.post('/webhook', async (req: Request, res: Response): Promise<void> => {
             console.log(`📅 [Financeiro] Conta a pagar registrada: R$ ${totalNota} - Vencimento: ${dadosNota.dataVencimento}`);
           } catch (errDb) {
             console.error('❌ [Financeiro] Erro ao salvar ContaPagar no banco:', errDb);
+          }
+
+          // Integração com Google Calendar
+          try {
+            await criarEventoVencimento(nomeFornecedorFinal, totalNota, dadosNota.dataVencimento);
+          } catch (errCal) {
+            console.error('❌ [Google Calendar] Erro ao agendar no Calendar:', errCal);
           }
         }
 

@@ -4,11 +4,13 @@ import { PrismaClient } from '@prisma/client';
 const prisma = new PrismaClient();
 const router = Router();
 
+import { criarEventoVencimento } from '../services/calendar';
+
 /**
  * @swagger
  * /financeiro/contas-pagar:
  *   get:
- *     summary: Lista todas as contas a pagar pendentes
+ *     summary: Lista todas as contas a pagar
  *     tags: [Financeiro]
  *     responses:
  *       200:
@@ -21,8 +23,6 @@ router.get('/contas-pagar', async (req: Request, res: Response): Promise<void> =
     const where: any = {};
     if (status && status !== 'TODAS') {
       where.status = String(status);
-    } else if (!status) {
-      where.status = 'PENDENTE';
     }
 
     const contas = await prisma.contaPagar.findMany({
@@ -61,14 +61,26 @@ router.post('/contas-pagar', async (req: Request, res: Response): Promise<void> 
       return;
     }
 
+    const nomeFornecedorFinal = nomeFornecedor || 'Fornecedor Avulso';
+    const valorNum = Number(valor);
+
     const conta = await prisma.contaPagar.create({
       data: {
-        nomeFornecedor: nomeFornecedor || 'Fornecedor Avulso',
-        valor: Number(valor),
+        nomeFornecedor: nomeFornecedorFinal,
+        valor: valorNum,
         dataVencimento: dataVencimento || null,
         status: status || 'PENDENTE',
       },
     });
+
+    // Se tiver data de vencimento, tenta criar evento no Google Calendar
+    if (dataVencimento) {
+      try {
+        await criarEventoVencimento(nomeFornecedorFinal, valorNum, dataVencimento);
+      } catch (errCal) {
+        console.warn('⚠️ [Google Calendar] Falha ao criar evento no Calendar:', errCal);
+      }
+    }
 
     res.status(201).json(conta);
   } catch (error: any) {

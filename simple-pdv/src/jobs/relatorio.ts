@@ -90,14 +90,74 @@ export async function gerarRelatorio(): Promise<string> {
   }
 }
 
+export async function verificarContasVencendo(): Promise<string | null> {
+  try {
+    const contasPendentes = await prisma.contaPagar.findMany({
+      where: { status: 'PENDENTE' },
+      orderBy: { createdAt: 'desc' },
+    });
+
+    const now = new Date();
+    const hojeStart = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 0, 0, 0);
+    const limite3Dias = new Date(hojeStart.getTime() + 3 * 24 * 60 * 60 * 1000 + 23 * 59 * 59 * 999);
+
+    const contasVencendo = contasPendentes.filter((c) => {
+      if (!c.dataVencimento) return false;
+      const clean = c.dataVencimento.trim();
+      let dt: Date | null = null;
+      if (/^\d{2}\/\d{2}\/\d{4}$/.test(clean)) {
+        const [d, m, y] = clean.split('/').map(Number);
+        dt = new Date(y, m - 1, d, 0, 0, 0);
+      } else if (/^\d{2}-\d{2}-\d{4}$/.test(clean)) {
+        const [d, m, y] = clean.split('-').map(Number);
+        dt = new Date(y, m - 1, d, 0, 0, 0);
+      } else if (/^\d{4}-\d{2}-\d{2}/.test(clean)) {
+        const [y, m, d] = clean.substring(0, 10).split('-').map(Number);
+        dt = new Date(y, m - 1, d, 0, 0, 0);
+      } else {
+        const parsed = new Date(clean);
+        dt = isNaN(parsed.getTime()) ? null : parsed;
+      }
+
+      if (!dt) return false;
+      return dt <= limite3Dias;
+    });
+
+    if (contasVencendo.length === 0) {
+      console.log('ℹ️ [Cron 8h - Financeiro] Nenhuma conta com vencimento próximo.');
+      return null;
+    }
+
+    const linhas = contasVencendo
+      .map((c) => `• ${c.nomeFornecedor} — R$ ${c.valor.toFixed(2)} — vence ${c.dataVencimento}`)
+      .join('\n');
+
+    const mensagem = `⚠️ Contas vencendo em breve:\n${linhas}`;
+
+    const numeroDestino = process.env.NUMERO_TITO || '5511967634294';
+    console.log(`📱 [Cron 8h - Financeiro] Enviando alerta de contas a pagar para ${numeroDestino}...`);
+    await enviarMensagem(numeroDestino, mensagem);
+    return mensagem;
+  } catch (error) {
+    console.error('❌ [Cron 8h - Financeiro] Erro ao verificar contas vencendo:', error);
+    return null;
+  }
+}
+
 export function initRelatorioJob() {
+  // Executa todo dia às 08:00 para alertar contas a vencer nos próximos 3 dias
+  cron.schedule('0 8 * * *', async () => {
+    console.log('⏰ [Cron] Executando rotina diária das 08h: Verificação de contas vencendo...');
+    await verificarContasVencendo();
+  });
+
   // Executa todo dia às 18:00 (0 18 * * *)
   cron.schedule('0 18 * * *', async () => {
     console.log('⏰ [Cron] Executando rotina diária das 18h: Geração e envio do Relatório WhatsApp...');
     await gerarRelatorio();
   });
 
-  console.log('📅 [Cron Job] Agendador de Relatório do WhatsApp inicializado (Horário: 18:00 diariamente).');
+  console.log('📅 [Cron Job] Agendadores inicializados: 08:00 (Contas a vencer) e 18:00 (Relatório Diário).');
 }
 
 export default initRelatorioJob;

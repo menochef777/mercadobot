@@ -178,8 +178,17 @@ interface CartItem {
   stockAvailable?: number;
 }
 
+interface ContaPagar {
+  id: string;
+  nomeFornecedor: string;
+  valor: number;
+  dataVencimento?: string | null;
+  status: string;
+  createdAt: string;
+}
+
 export default function Dashboard() {
-  const [activeTab, setActiveTab] = useState<'caixa' | 'fiado' | 'estoque' | 'fornecedores'>('caixa');
+  const [activeTab, setActiveTab] = useState<'caixa' | 'fiado' | 'estoque' | 'fornecedores' | 'financeiro'>('caixa');
   
   // Data State
   const [fiados, setFiados] = useState<Fiado[]>([]);
@@ -189,8 +198,17 @@ export default function Dashboard() {
   const [fornecedores, setFornecedores] = useState<Fornecedor[]>([]);
   const [vendasHoje, setVendasHoje] = useState<Venda[]>([]);
   const [totalCaixaHoje, setTotalCaixaHoje] = useState(0);
+  const [contasPagar, setContasPagar] = useState<ContaPagar[]>([]);
+  const [totalPendenteFinanceiro, setTotalPendenteFinanceiro] = useState(0);
+  const [filtroFinanceiro, setFiltroFinanceiro] = useState<'TODAS' | 'PENDENTE' | 'PAGO'>('TODAS');
   const [loading, setLoading] = useState(false);
   const [message, setMessage] = useState<{ text: string; type: 'success' | 'error' } | null>(null);
+
+  // Form Nova Conta a Pagar
+  const [novaContaFornecedor, setNovaContaFornecedor] = useState('');
+  const [novaContaValor, setNovaContaValor] = useState('');
+  const [novaContaVencimento, setNovaContaVencimento] = useState('');
+  const [financeiroLoading, setFinanceiroLoading] = useState(false);
 
   // Modal de Reposição / Atualização de Estoque
   const [reporModalOpen, setReporModalOpen] = useState(false);
@@ -351,6 +369,27 @@ export default function Dashboard() {
     }
   };
 
+  const fetchContasPagar = async () => {
+    try {
+      setLoading(true);
+      const res = await fetch(`${API_BASE}/financeiro/contas-pagar`);
+      if (res.ok) {
+        const data = await res.json();
+        setContasPagar(Array.isArray(data.contas) ? data.contas : []);
+        setTotalPendenteFinanceiro(typeof data.totalPendente === 'number' ? data.totalPendente : 0);
+      }
+    } catch (err) {
+      console.error('Erro ao buscar contas a pagar:', err);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    // Carrega resumo inicial financeiro
+    fetchContasPagar();
+  }, []);
+
   useEffect(() => {
     if (activeTab === 'fiado') fetchFiados();
     if (activeTab === 'estoque') {
@@ -359,6 +398,7 @@ export default function Dashboard() {
     }
     if (activeTab === 'fornecedores') fetchFornecedores();
     if (activeTab === 'caixa') fetchVendasHoje();
+    if (activeTab === 'financeiro') fetchContasPagar();
   }, [activeTab]);
 
   // Logout
@@ -802,6 +842,80 @@ export default function Dashboard() {
     }
   };
 
+  // =========================================================================
+  // FINANCEIRO / CONTAS A PAGAR ACTIONS
+  // =========================================================================
+  const isVencendoEmMenosDe3Dias = (dataVencimento?: string | null, status?: string): boolean => {
+    if (status === 'PAGO' || !dataVencimento) return false;
+    const clean = dataVencimento.trim();
+    let dt: Date | null = null;
+    if (/^\d{2}\/\d{2}\/\d{4}$/.test(clean)) {
+      const [d, m, y] = clean.split('/').map(Number);
+      dt = new Date(y, m - 1, d, 0, 0, 0);
+    } else if (/^\d{2}-\d{2}-\d{4}$/.test(clean)) {
+      const [d, m, y] = clean.split('-').map(Number);
+      dt = new Date(y, m - 1, d, 0, 0, 0);
+    } else if (/^\d{4}-\d{2}-\d{2}/.test(clean)) {
+      const [y, m, d] = clean.substring(0, 10).split('-').map(Number);
+      dt = new Date(y, m - 1, d, 0, 0, 0);
+    } else {
+      const parsed = new Date(clean);
+      dt = isNaN(parsed.getTime()) ? null : parsed;
+    }
+    if (!dt) return false;
+    const now = new Date();
+    const hoje = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 0, 0, 0);
+    const diffDays = Math.ceil((dt.getTime() - hoje.getTime()) / (1000 * 60 * 60 * 24));
+    return diffDays <= 3;
+  };
+
+  const handleMarcarComoPago = async (id: string, nomeFornecedor: string) => {
+    try {
+      const res = await fetch(`${API_BASE}/financeiro/contas-pagar/${id}/pagar`, {
+        method: 'PATCH',
+      });
+      if (res.ok) {
+        showToast(`Conta de "${nomeFornecedor}" marcada como PAGA com sucesso!`);
+        fetchContasPagar();
+      } else {
+        showToast('Erro ao atualizar status da conta.', 'error');
+      }
+    } catch (err) {
+      showToast('Erro de conexão ao marcar conta como paga.', 'error');
+    }
+  };
+
+  const handleCriarContaPagar = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!novaContaFornecedor || !novaContaValor) return;
+    try {
+      setFinanceiroLoading(true);
+      const res = await fetch(`${API_BASE}/financeiro/contas-pagar`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          nomeFornecedor: novaContaFornecedor.trim(),
+          valor: parseFloat(novaContaValor),
+          dataVencimento: novaContaVencimento.trim() || undefined,
+        }),
+      });
+      if (res.ok) {
+        showToast('Nova conta a pagar registrada com sucesso!');
+        setNovaContaFornecedor('');
+        setNovaContaValor('');
+        setNovaContaVencimento('');
+        fetchContasPagar();
+      } else {
+        const errData = await res.json().catch(() => ({}));
+        showToast(errData.error || 'Erro ao registrar conta a pagar.', 'error');
+      }
+    } catch (err) {
+      showToast('Erro de conexão ao registrar conta a pagar.', 'error');
+    } finally {
+      setFinanceiroLoading(false);
+    }
+  };
+
   const totalFiadosPendentes = fiados.reduce((acc, f) => acc + f.valor, 0);
 
   return (
@@ -869,7 +983,7 @@ export default function Dashboard() {
         )}
 
         {/* Resumo Rápido Cards */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4">
           <div className="p-5 rounded-2xl bg-white/[0.03] border border-white/10 flex items-center justify-between">
             <div>
               <p className="text-xs text-neutral-400 uppercase tracking-wider font-medium">Caixa de Hoje</p>
@@ -893,6 +1007,19 @@ export default function Dashboard() {
             </div>
             <div className="p-3 rounded-xl bg-[#4ade80]/15 text-[#4ade80]">
               <BookOpenIcon className="w-6 h-6" />
+            </div>
+          </div>
+
+          <div className="p-5 rounded-2xl bg-white/[0.03] border border-white/10 flex items-center justify-between">
+            <div>
+              <p className="text-xs text-neutral-400 uppercase tracking-wider font-medium">Contas a Pagar</p>
+              <h3 className="text-2xl font-bold font-['Manrope'] text-rose-400 mt-1">
+                R$ {totalPendenteFinanceiro.toFixed(2)}
+              </h3>
+              <p className="text-xs text-neutral-400 mt-1">Total pendente</p>
+            </div>
+            <div className="p-3 rounded-xl bg-rose-500/15 text-rose-400 font-bold text-xl flex items-center justify-center">
+              💰
             </div>
           </div>
 
@@ -971,6 +1098,18 @@ export default function Dashboard() {
           >
             <BookOpenIcon className="w-4 h-4" />
             Fiado Digital ({fiados.length})
+          </button>
+
+          <button
+            onClick={() => setActiveTab('financeiro')}
+            className={`flex items-center gap-2 px-5 py-3 font-['Manrope'] font-semibold text-sm rounded-t-xl transition-all ${
+              activeTab === 'financeiro'
+                ? 'bg-white/[0.08] text-[#4ade80] border-b-2 border-[#4ade80]'
+                : 'text-neutral-400 hover:text-white hover:bg-white/[0.02]'
+            }`}
+          >
+            <span>💰</span>
+            Financeiro 💰
           </button>
         </div>
 
@@ -2074,6 +2213,250 @@ export default function Dashboard() {
                     ))}
                   </div>
                 )}
+              </div>
+            </div>
+          )}
+
+          {/* ================================================================= */}
+          {/* ABA 5: FINANCEIRO & CONTAS A PAGAR */}
+          {/* ================================================================= */}
+          {activeTab === 'financeiro' && (
+            <div className="flex flex-col gap-6">
+              {/* Top Banner de Destaque: Total Pendente */}
+              <div className="p-6 md:p-8 rounded-3xl bg-gradient-to-r from-rose-950/60 via-red-950/40 to-neutral-900 border border-rose-500/30 backdrop-blur-xl flex flex-col md:flex-row items-start md:items-center justify-between gap-6 shadow-2xl relative overflow-hidden">
+                <div className="flex items-center gap-4">
+                  <div className="w-16 h-16 rounded-2xl bg-rose-500/20 border border-rose-500/40 flex items-center justify-center text-3xl shrink-0 shadow-inner">
+                    💸
+                  </div>
+                  <div>
+                    <span className="text-xs uppercase tracking-wider font-semibold text-rose-300">
+                      Gestão de Despesas & Contas
+                    </span>
+                    <h2 className="font-['Manrope'] font-extrabold text-3xl md:text-4xl text-white mt-0.5">
+                      R$ {totalPendenteFinanceiro.toFixed(2)}
+                    </h2>
+                    <p className="text-xs text-neutral-300 mt-1 flex items-center gap-2">
+                      <span className="w-2 h-2 rounded-full bg-rose-400 animate-ping" />
+                      Total de contas pendentes a pagar
+                    </p>
+                  </div>
+                </div>
+
+                <div className="flex items-center gap-3 w-full md:w-auto">
+                  <button
+                    onClick={fetchContasPagar}
+                    className="flex-1 md:flex-none px-4 py-2.5 rounded-xl bg-white/10 hover:bg-white/15 text-white text-xs font-semibold border border-white/10 transition-colors"
+                  >
+                    🔄 Atualizar Lista
+                  </button>
+                </div>
+              </div>
+
+              {/* Grid: Formulário na Esquerda + Lista de Contas na Direita */}
+              <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
+                
+                {/* Coluna Esquerda: Formulário de Adicionar Conta Manual */}
+                <div className="lg:col-span-4 p-6 rounded-3xl bg-white/[0.03] border border-white/10 backdrop-blur-xl flex flex-col gap-4 h-fit">
+                  <div className="flex items-center gap-2">
+                    <span className="text-lg">➕</span>
+                    <h3 className="font-['Manrope'] font-bold text-lg text-white">
+                      Adicionar Conta a Pagar
+                    </h3>
+                  </div>
+                  <p className="text-xs text-neutral-400">
+                    Cadastre despesas manuais ou faturas de compras. O lembrete será sincronizado com o WhatsApp e Google Calendar.
+                  </p>
+
+                  <form onSubmit={handleCriarContaPagar} className="flex flex-col gap-3.5 mt-1">
+                    <div>
+                      <label className="block text-xs font-medium text-neutral-300 mb-1">
+                        Nome do Fornecedor / Conta *
+                      </label>
+                      <input
+                        type="text"
+                        required
+                        placeholder="Ex: Distribuidora Ambev / Luz / Aluguel"
+                        value={novaContaFornecedor}
+                        onChange={(e) => setNovaContaFornecedor(e.target.value)}
+                        className="w-full px-3.5 py-2.5 rounded-xl bg-black/60 border border-white/15 text-white text-sm focus:outline-none focus:border-[#4ade80]"
+                      />
+                    </div>
+
+                    <div>
+                      <label className="block text-xs font-medium text-neutral-300 mb-1">
+                        Valor a Pagar (R$) *
+                      </label>
+                      <input
+                        type="number"
+                        step="0.01"
+                        min="0.01"
+                        required
+                        placeholder="Ex: 450.00"
+                        value={novaContaValor}
+                        onChange={(e) => setNovaContaValor(e.target.value)}
+                        className="w-full px-3.5 py-2.5 rounded-xl bg-black/60 border border-white/15 text-white text-sm font-mono focus:outline-none focus:border-[#4ade80]"
+                      />
+                    </div>
+
+                    <div>
+                      <label className="block text-xs font-medium text-neutral-300 mb-1">
+                        Data de Vencimento
+                      </label>
+                      <input
+                        type="date"
+                        value={novaContaVencimento}
+                        onChange={(e) => setNovaContaVencimento(e.target.value)}
+                        className="w-full px-3.5 py-2.5 rounded-xl bg-black/60 border border-white/15 text-white text-sm focus:outline-none focus:border-[#4ade80]"
+                      />
+                      <span className="text-[11px] text-neutral-400 mt-1 block">
+                        💡 Agendamento automático no Google Calendar
+                      </span>
+                    </div>
+
+                    <button
+                      type="submit"
+                      disabled={financeiroLoading}
+                      className="w-full mt-2 py-3 rounded-xl bg-[#4ade80] text-[#14532d] font-['Cabin'] font-bold text-sm hover:bg-[#3ec972] transition-all shadow-lg active:scale-95 disabled:opacity-50 cursor-pointer"
+                    >
+                      {financeiroLoading ? 'Salvando...' : 'Salvar Conta a Pagar'}
+                    </button>
+                  </form>
+                </div>
+
+                {/* Coluna Direita: Cards das Contas a Pagar */}
+                <div className="lg:col-span-8 flex flex-col gap-4">
+                  
+                  {/* Filtro e Título */}
+                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 bg-white/[0.02] p-4 rounded-2xl border border-white/10">
+                    <div>
+                      <h3 className="font-['Manrope'] font-bold text-lg text-white">
+                        Contas a Pagar ({contasPagar.length})
+                      </h3>
+                      <span className="text-xs text-neutral-400">
+                        Acompanhe datas de vencimento e pagamentos efetuados
+                      </span>
+                    </div>
+
+                    {/* Filtros */}
+                    <div className="flex items-center gap-1.5 bg-black/40 p-1 rounded-xl border border-white/10 self-start sm:self-auto">
+                      {(['TODAS', 'PENDENTE', 'PAGO'] as const).map((filtro) => (
+                        <button
+                          key={filtro}
+                          type="button"
+                          onClick={() => setFiltroFinanceiro(filtro)}
+                          className={`px-3 py-1 text-xs font-bold rounded-lg transition-colors ${
+                            filtroFinanceiro === filtro
+                              ? 'bg-white/20 text-white'
+                              : 'text-neutral-400 hover:text-white'
+                          }`}
+                        >
+                          {filtro === 'TODAS' ? 'Todas' : filtro === 'PENDENTE' ? 'Pendentes' : 'Pagas'}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+
+                  {/* Lista de Cards */}
+                  {contasPagar.length === 0 ? (
+                    <div className="p-12 rounded-3xl bg-white/[0.02] border border-white/10 text-center flex flex-col items-center justify-center gap-3 text-neutral-500">
+                      <span className="text-4xl">🎉</span>
+                      <p className="text-sm font-medium">Nenhuma conta a pagar registrada!</p>
+                      <p className="text-xs text-neutral-400">
+                        Envie fotos de notas fiscais pelo WhatsApp ou cadastre uma conta no formulário ao lado.
+                      </p>
+                    </div>
+                  ) : (
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      {contasPagar
+                        .filter((conta) => filtroFinanceiro === 'TODAS' || conta.status === filtroFinanceiro)
+                        .map((conta) => {
+                          const venceBreve = isVencendoEmMenosDe3Dias(conta.dataVencimento, conta.status);
+                          const isPendente = conta.status === 'PENDENTE';
+
+                          return (
+                            <div
+                              key={conta.id}
+                              className={`p-5 rounded-2xl flex flex-col justify-between gap-4 transition-all relative overflow-hidden ${
+                                venceBreve
+                                  ? 'bg-red-950/30 border-2 border-red-500 shadow-lg shadow-red-500/10'
+                                  : isPendente
+                                  ? 'bg-white/[0.03] border border-white/10 hover:border-white/20'
+                                  : 'bg-emerald-950/20 border border-emerald-500/20 opacity-90'
+                              }`}
+                            >
+                              {/* Alerta de vencimento urgente no topo do card */}
+                              {venceBreve && (
+                                <div className="absolute top-0 right-0 bg-red-600 text-white text-[10px] font-extrabold uppercase px-2.5 py-0.5 rounded-bl-lg tracking-wider flex items-center gap-1 shadow">
+                                  <span>⚠️</span> Vence em &lt; 3 dias!
+                                </div>
+                              )}
+
+                              <div>
+                                {/* Header do Card: Fornecedor e Status Badge */}
+                                <div className="flex items-start justify-between gap-2">
+                                  <div className="min-w-0 pr-2">
+                                    <h4 className="font-['Manrope'] font-bold text-base text-white truncate" title={conta.nomeFornecedor}>
+                                      {conta.nomeFornecedor}
+                                    </h4>
+                                    <span className="text-[11px] text-neutral-400">
+                                      Registrado em: {new Date(conta.createdAt).toLocaleDateString('pt-BR')}
+                                    </span>
+                                  </div>
+
+                                  <div className="shrink-0 pt-0.5">
+                                    {isPendente ? (
+                                      <span className="text-[10px] font-bold px-2.5 py-1 rounded-full bg-rose-950 text-rose-300 border border-rose-500/40">
+                                        PENDENTE
+                                      </span>
+                                    ) : (
+                                      <span className="text-[10px] font-bold px-2.5 py-1 rounded-full bg-emerald-950 text-emerald-300 border border-emerald-500/40">
+                                        PAGO
+                                      </span>
+                                    )}
+                                  </div>
+                                </div>
+
+                                {/* Valor da Conta */}
+                                <div className="mt-3">
+                                  <span className="text-xs text-neutral-400 block">Valor a pagar:</span>
+                                  <span className={`font-['Manrope'] font-extrabold text-2xl ${venceBreve ? 'text-rose-400' : 'text-[#4ade80]'}`}>
+                                    R$ {conta.valor.toFixed(2)}
+                                  </span>
+                                </div>
+
+                                {/* Data de Vencimento */}
+                                {conta.dataVencimento && (
+                                  <div className="mt-2.5 flex items-center gap-1.5 text-xs">
+                                    <span className="text-neutral-400">📅 Vencimento:</span>
+                                    <span className={`font-bold font-mono px-2 py-0.5 rounded-md ${
+                                      venceBreve
+                                        ? 'bg-red-500/20 text-red-200 border border-red-500/40'
+                                        : 'bg-white/5 text-neutral-200'
+                                    }`}>
+                                      {conta.dataVencimento}
+                                    </span>
+                                  </div>
+                                )}
+                              </div>
+
+                              {/* Rodapé / Botão de Ação */}
+                              {isPendente && (
+                                <div className="pt-3 border-t border-white/10 flex items-center justify-end">
+                                  <button
+                                    onClick={() => handleMarcarComoPago(conta.id, conta.nomeFornecedor)}
+                                    className="w-full py-2 px-3 rounded-xl bg-emerald-950/80 hover:bg-emerald-900 text-emerald-300 border border-emerald-500/40 text-xs font-bold transition-all flex items-center justify-center gap-1.5 cursor-pointer shadow-sm active:scale-95"
+                                  >
+                                    <CheckIcon className="w-3.5 h-3.5" />
+                                    Marcar como Pago
+                                  </button>
+                                </div>
+                              )}
+                            </div>
+                          );
+                        })}
+                    </div>
+                  )}
+                </div>
               </div>
             </div>
           )}
