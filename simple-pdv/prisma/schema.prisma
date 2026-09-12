@@ -1,0 +1,130 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+// Looking for ways to speed up your queries, or scale easily with your serverless or edge functions?
+// Try Prisma Accelerate: https://pris.ly/cli/accelerate-init
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model Role {
+  id          String           @id @default(uuid())
+  name        String           @unique
+  permissions RolePermission[]
+  users       User[]
+}
+
+model Permission {
+  id    String           @id @default(uuid())
+  name  String           @unique
+  roles RolePermission[]
+}
+
+model RolePermission {
+  roleId       String
+  permissionId String
+  Role         Role       @relation(fields: [roleId], references: [id])
+  Permission   Permission @relation(fields: [permissionId], references: [id])
+
+  @@id([roleId, permissionId])
+}
+
+model User {
+  userId   String  @id @default(uuid())
+  name     String
+  password String
+  userName String  @unique
+  email    String  @unique
+  data     DateTime @default(now())
+  phone    String? @unique
+  cpf      String  @unique
+  Role     Role?   @relation(fields: [roleName], references: [name])
+  roleName String? @default("Seller")   
+}
+
+model Product {
+  productId          String    @id @default(uuid())
+  barcode            String
+  sku                String
+  name               String
+  description        String
+  categoryId         Category? @relation(fields: [categoryCategoryId], references: [categoryId])
+  price              Float
+  costPrice          Float
+  discount           Float?
+  stockQuantity      Int
+  quantidadeAtual    Int       @default(0)
+  quantidadeMinima   Int       @default(5)
+  weight             Float?
+  categoryCategoryId String?
+  items              Item[]
+  imgURL             String    @default("/files/1720098149585_por-do-sol-e-silhuetas-de-arvores-nas-montanhas-generative-ai.jpg")
+}
+
+
+
+model Category {
+  categoryId String     @id @default(uuid())
+  name       String
+  parentId   String?
+  parent     Category?  @relation("CategoryToParent", fields: [parentId], references: [categoryId])
+  children   Category[] @relation("CategoryToParent")
+  Product    Product[]
+}
+
+model Order {
+  orderId         String   @id @default(uuid())
+  items           Item[]
+  date            DateTime @default(now())
+  status          String   @default("await paypament")
+  paypamentMethod String   @default("none")
+}
+
+model Item {
+  quantity  Int
+  itemId    String   @id @default(uuid())
+  Product   Product? @relation(fields: [productId], references: [productId])
+  productId String?
+  Order     Order?   @relation(fields: [orderId], references: [orderId])
+  orderId   String?
+}
+
+model Fiado {
+  id              String    @id @default(uuid())
+  nomeCliente     String
+  telefoneCliente String?
+  valor           Float
+  descricao       String?
+  dataCriacao     DateTime  @default(now())
+  status          String    @default("PENDENTE")
+  dataPagamento   DateTime?
+}
+
+model Fornecedor {
+  id                 String    @id @default(uuid())
+  nome               String
+  telefone           String?
+  produtos           String?
+  diaVisita          String?
+  ultimaEntregaData  DateTime?
+  ultimaEntregaValor Float?
+  createdAt          DateTime  @default(now())
+}
+
+model Venda {
+  id              String   @id @default(uuid())
+  valor           Float
+  formaPagamento  String
+  cliente         String?
+  itens           String?
+  createdAt       DateTime @default(now())
+}
+
+
+
