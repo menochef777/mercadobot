@@ -360,16 +360,30 @@ app.post('/webhook', async (req: Request, res: Response): Promise<void> => {
 
     console.log(`💬 [WhatsApp] Mensagem de ${senderNumber}: "${textRaw}"`);
 
-    // 2. Comando "fiado [nome]"
-    if (textLower.startsWith('fiado')) {
-      const nomeBusca = textRaw.replace(/^fiado\s*/i, '').trim();
+    // 2. Comando "fiado" ou "fiados"
+    if (textLower.startsWith('fiado') || textLower.startsWith('fiados')) {
+      const nomeBusca = textRaw.replace(/^(fiados|fiado)\s*/i, '').trim();
 
       if (!nomeBusca) {
-        await enviarMensagem(
-          senderNumber,
-          '❓ Por favor, informe o nome do cliente.\nExemplo: *fiado Seu Raimundo*'
-        );
-        res.status(200).json({ status: 'fiado_missing_name' });
+        // Se digitou apenas "fiado" ou "fiados", lista todos os fiados pendentes gerais
+        const fiados = await prisma.fiado.findMany({
+          where: { status: 'PENDENTE' },
+          orderBy: { dataCriacao: 'desc' },
+        });
+
+        if (fiados.length === 0) {
+          await enviarMensagem(senderNumber, '✅ Nenhum fiado pendente registrado no momento!');
+        } else {
+          const total = fiados.reduce((acc, f) => acc + f.valor, 0);
+          const linhas = fiados
+            .slice(0, 10)
+            .map((f) => `• *${f.nomeCliente}*: R$ ${f.valor.toFixed(2)} (${f.descricao || 'Compras'})`)
+            .join('\n');
+
+          const resposta = `📋 *Fiados Pendentes (${fiados.length} registros):*\n\n${linhas}\n\n💰 *Total Geral a Receber: R$ ${total.toFixed(2)}*\n\n💡 Para buscar um cliente específico, digite: *fiado [nome]*`;
+          await enviarMensagem(senderNumber, resposta);
+        }
+        res.status(200).json({ status: 'fiado_list_processed' });
         return;
       }
 
@@ -412,8 +426,8 @@ app.post('/webhook', async (req: Request, res: Response): Promise<void> => {
       return;
     }
 
-    // 3. Comando "estoque" / "!estoque"
-    if (textLower === 'estoque' || textLower === '!estoque' || textLower === 'alertas') {
+    // 3. Comando "estoque" / "!estoque" / "produtos"
+    if (textLower === 'estoque' || textLower === '!estoque' || textLower === 'alertas' || textLower === 'produtos') {
       const produtos = await prisma.product.findMany();
       const alertas = produtos.filter((p) => p.quantidadeAtual <= p.quantidadeMinima);
 
@@ -440,8 +454,10 @@ app.post('/webhook', async (req: Request, res: Response): Promise<void> => {
       return;
     }
 
-    // 4. Comando "caixa hoje" / "caixa" / "vendas hoje"
+    // 4. Comando "vendas" / "venda" / "caixa hoje" / "caixa" / "vendas hoje"
     if (
+      textLower === 'vendas' ||
+      textLower === 'venda' ||
       textLower === 'caixa hoje' ||
       textLower === 'caixa' ||
       textLower === 'vendas hoje' ||
@@ -474,52 +490,34 @@ app.post('/webhook', async (req: Request, res: Response): Promise<void> => {
       return;
     }
 
-    // 5. Comando de Ajuda / Menu Padrão / Saudações
+    // 5. Comando "notas fiscais" / "nota fiscal" / "nota"
     if (
-      textLower === 'ajuda' ||
-      textLower === 'menu' ||
-      textLower === 'oi' ||
-      textLower === 'olá' ||
-      textLower === 'ola' ||
-      textLower === 'bom dia' ||
-      textLower === 'boa tarde' ||
-      textLower === 'boa noite' ||
-      textLower === 'iniciar' ||
-      textLower === 'start' ||
-      textLower === 'comandos'
+      textLower === 'notas fiscais' ||
+      textLower === 'nota fiscal' ||
+      textLower === 'notas' ||
+      textLower === 'nota'
     ) {
-      const menu = `🤖 *miniMercado BomPreço*\n\n` +
-        `Olá Marcio e Ângelica! 👋 Estou pronto para ajudar a acompanhar o seu mercado.\n\n` +
-        `Você pode me pedir informações sobre:\n\n` +
-        `💰 *Vendas*\n` +
-        `Digite *caixa hoje* para ver quanto foi vendido hoje, número de vendas e o andamento do caixa.\n\n` +
-        `📦 *Estoque*\n` +
-        `Digite *estoque* para conferir os produtos que estão acabando ou que já estão em falta.\n\n` +
-        `📋 *Fiados*\n` +
-        `Digite *fiado [nome]* _(ex: fiado Seu Raimundo)_ para consultar o que um cliente está devendo e o total pendente.\n\n` +
-        `🧾 *Notas Fiscais*\n` +
-        `Envie uma foto da nota fiscal e eu identifico os produtos, atualizo o estoque e registro a compra automaticamente.`;
-
-      await enviarMensagem(senderNumber, menu);
-      res.status(200).json({ status: 'menu_sent' });
+      const respostaNota = `🧾 *Notas Fiscais*\n\nEnvie uma foto da nota fiscal aqui no chat e eu identifico os produtos, atualizo o estoque e registro a compra automaticamente.`;
+      await enviarMensagem(senderNumber, respostaNota);
+      res.status(200).json({ status: 'notas_info_sent' });
       return;
     }
 
-    // Mensagem não reconhecida — responde com o menu de ajuda
-    const menuPadrao = `🤖 *miniMercado BomPreço*\n\n` +
+    // 6. Mensagem de Boas-vindas / Menu Principal
+    const mensagemBoasVindas = `🤖 *miniMercado BomPreço*\n\n` +
       `Olá Marcio e Ângelica! 👋 Estou pronto para ajudar a acompanhar o seu mercado.\n\n` +
       `Você pode me pedir informações sobre:\n\n` +
       `💰 *Vendas*\n` +
-      `Digite *caixa hoje* para ver quanto foi vendido hoje, número de vendas e o andamento do caixa.\n\n` +
+      `Veja quanto foi vendido hoje, número de vendas e o andamento do caixa.\n\n` +
       `📦 *Estoque*\n` +
-      `Digite *estoque* para conferir os produtos que estão acabando ou que já estão em falta.\n\n` +
+      `Confira os produtos que estão acabando ou que já estão em falta.\n\n` +
       `📋 *Fiados*\n` +
-      `Digite *fiado [nome]* _(ex: fiado Seu Raimundo)_ para consultar o que um cliente está devendo e o total pendente.\n\n` +
-      `🧾 *Notas Fiscais*\n` +
-      `Envie uma foto da nota fiscal e eu identifico os produtos, atualizo o estoque e registro a compra automaticamente.`;
+      `Consulte o que um cliente está devendo e o total pendente.\n\n` +
+      `🧾 *Notas fiscais*\n` +
+      `Envie uma foto da nota fiscal e eu identifico os produtos, atualizo o estoque e registro a compra.`;
 
-    await enviarMensagem(senderNumber, menuPadrao);
-    res.status(200).json({ status: 'unhandled_command_menu_sent' });
+    await enviarMensagem(senderNumber, mensagemBoasVindas);
+    res.status(200).json({ status: 'menu_sent' });
   } catch (error: any) {
     console.error('❌ [Webhook WhatsApp] Erro ao processar webhook:', error);
     res.status(500).json({ error: 'Erro interno ao processar webhook do WhatsApp.' });
