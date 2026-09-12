@@ -15,6 +15,7 @@ import Estoque from './routers/estoque'
 import Venda from './routers/venda'
 import Cosmos from './routers/cosmos'
 import WhatsApp from './routers/whatsapp'
+import Financeiro from './routers/financeiro'
 import wellcomeRouter from "./routers/wellcome"
 import cors = require('cors')
 import authenticateToken from "./midleware/authenticate"
@@ -49,6 +50,7 @@ app.use('/fiado', Fiado)
 app.use('/fornecedor', Fornecedor)
 app.use('/estoque', Estoque)
 app.use('/venda', Venda)
+app.use('/financeiro', Financeiro)
 app.use('/', wellcomeRouter)
 
 

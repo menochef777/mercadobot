@@ -6,6 +6,13 @@ export interface ProdutoNotaFiscal {
   valorUnitario: number;
 }
 
+export interface DadosNotaFiscal {
+  produtos: ProdutoNotaFiscal[];
+  valorTotal: number;
+  dataVencimento: string | null;
+  nomeFornecedor: string | null;
+}
+
 const MODELOS_SUPORTADOS = [
   'gemini-3.6-flash',
   'gemini-3.7-flash',
@@ -15,7 +22,7 @@ const MODELOS_SUPORTADOS = [
 export async function lerNotaFiscal(
   imagemBase64: string,
   mimeType: string = 'image/jpeg'
-): Promise<ProdutoNotaFiscal[]> {
+): Promise<DadosNotaFiscal> {
   const apiKey = process.env.GEMINI_API_KEY;
   if (!apiKey || apiKey === 'sua-chave') {
     console.warn('⚠️ [Gemini] GEMINI_API_KEY não configurada no ambiente.');
@@ -27,8 +34,19 @@ export async function lerNotaFiscal(
 
   const genAI = new GoogleGenerativeAI(apiKey);
 
-  const prompt =
-    'Analise esta nota fiscal ou cupom fiscal brasileiro. Liste todos os produtos com: nome, quantidade e valor unitário. Responda APENAS em JSON array: [{"nome": "string", "quantidade": number, "valorUnitario": number}]. Não adicione texto extra nem explicações.';
+  const prompt = `Analise esta nota fiscal brasileira. Extraia:
+1. Lista de produtos com nome, quantidade e valorUnitario
+2. valorTotal da nota
+3. dataVencimento se existir (formato DD/MM/YYYY)
+4. nomeFornecedor se aparecer
+
+Responda APENAS em JSON no formato:
+{
+  "produtos": [{"nome": "string", "quantidade": number, "valorUnitario": number}],
+  "valorTotal": number,
+  "dataVencimento": string ou null,
+  "nomeFornecedor": string ou null
+}`;
 
   const imagePart = {
     inlineData: {
@@ -55,17 +73,37 @@ export async function lerNotaFiscal(
         .replace(/```\s*$/i, '')
         .trim();
 
-      const produtos = JSON.parse(jsonCleaned);
+      const parsed = JSON.parse(jsonCleaned);
 
-      if (!Array.isArray(produtos)) {
-        throw new Error('Formato retornado pelo Gemini não é uma lista de produtos.');
-      }
-
-      return produtos.map((item: any) => ({
+      // Suporta tanto o objeto estruturado quanto array direto caso a IA retorne
+      const rawProdutos = Array.isArray(parsed) ? parsed : (parsed.produtos || []);
+      const produtos: ProdutoNotaFiscal[] = rawProdutos.map((item: any) => ({
         nome: String(item.nome || item.name || 'Produto').trim(),
         quantidade: Math.max(1, Number(item.quantidade || item.qtd || item.quantity || 1)),
         valorUnitario: Number(item.valorUnitario || item.valor || item.unitPrice || item.preco || 0),
       }));
+
+      const valorTotal = Number(
+        parsed.valorTotal ||
+        produtos.reduce((acc, p) => acc + p.quantidade * p.valorUnitario, 0)
+      );
+
+      const dataVencimento =
+        typeof parsed.dataVencimento === 'string' && parsed.dataVencimento.trim() !== '' && parsed.dataVencimento.toLowerCase() !== 'null'
+          ? parsed.dataVencimento.trim()
+          : null;
+
+      const nomeFornecedor =
+        typeof parsed.nomeFornecedor === 'string' && parsed.nomeFornecedor.trim() !== '' && parsed.nomeFornecedor.toLowerCase() !== 'null'
+          ? parsed.nomeFornecedor.trim()
+          : null;
+
+      return {
+        produtos,
+        valorTotal,
+        dataVencimento,
+        nomeFornecedor,
+      };
     } catch (error: any) {
       console.warn(`⚠️ [Gemini] Falha no modelo ${modelName}:`, error.message);
       lastError = error;

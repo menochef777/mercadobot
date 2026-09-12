@@ -126,5 +126,14 @@ model Venda {
   createdAt       DateTime @default(now())
 }
 
+model ContaPagar {
+  id             String   @id @default(uuid())
+  nomeFornecedor String?
+  valor          Float
+  dataVencimento String?
+  status         String   @default("PENDENTE")
+  createdAt      DateTime @default(now())
+}
+
 
 

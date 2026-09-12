@@ -193,7 +193,8 @@ app.post('/webhook', async (req: Request, res: Response): Promise<void> => {
           return;
         }
 
-        const produtosExtraidos = await lerNotaFiscal(mediaInfo.base64, mediaInfo.mimetype);
+        const dadosNota = await lerNotaFiscal(mediaInfo.base64, mediaInfo.mimetype);
+        const produtosExtraidos = dadosNota.produtos || [];
 
         if (!produtosExtraidos || produtosExtraidos.length === 0) {
           await enviarMensagem(
@@ -233,6 +234,7 @@ app.post('/webhook', async (req: Request, res: Response): Promise<void> => {
             produtosAtualizados.push({
               nome: produto.name,
               qtd: item.quantidade,
+              valorUnitario: item.valorUnitario,
               totalEstoque: produto.quantidadeAtual,
               status: 'atualizado',
             });
@@ -255,12 +257,63 @@ app.post('/webhook', async (req: Request, res: Response): Promise<void> => {
             produtosAtualizados.push({
               nome: produto.name,
               qtd: item.quantidade,
+              valorUnitario: item.valorUnitario,
               totalEstoque: produto.quantidadeAtual,
               status: 'novo',
             });
           }
         }
 
+        const totalNota =
+          dadosNota.valorTotal > 0
+            ? dadosNota.valorTotal
+            : produtosAtualizados.reduce((acc, p) => acc + p.qtd * p.valorUnitario, 0);
+
+        // Se vier dataVencimento, salva a conta a pagar no banco
+        if (dadosNota.dataVencimento) {
+          try {
+            await prisma.contaPagar.create({
+              data: {
+                nomeFornecedor: dadosNota.nomeFornecedor || 'Fornecedor da Nota',
+                valor: totalNota,
+                dataVencimento: dadosNota.dataVencimento,
+                status: 'PENDENTE',
+              },
+            });
+            console.log(`📅 [Financeiro] Conta a pagar registrada: R$ ${totalNota} - Vencimento: ${dadosNota.dataVencimento}`);
+          } catch (errDb) {
+            console.error('❌ [Financeiro] Erro ao salvar ContaPagar no banco:', errDb);
+          }
+        }
+
+        // Notificações para o NUMERO_TITO
+        const rawNumeroTito = process.env.NUMERO_TITO;
+        if (rawNumeroTito) {
+          const numeroTito = formatarNumeroWhatsApp(rawNumeroTito);
+          if (numeroTito) {
+            // 1. Notificação de Nova nota processada se vier valorTotal
+            if (totalNota > 0) {
+              const msgTitoResumo =
+                `🧾 *Nova nota processada!*\n` +
+                `💰 *Valor total:* R$ ${totalNota.toFixed(2)}\n` +
+                `📦 *${produtosAtualizados.length} produtos atualizados no estoque*`;
+              await enviarMensagem(numeroTito, msgTitoResumo);
+            }
+
+            // 2. Notificação separada de Conta a pagar se vier dataVencimento
+            if (dadosNota.dataVencimento) {
+              const msgTitoConta =
+                `📅 *Conta a pagar registrada!*\n` +
+                `🏪 *Fornecedor:* ${dadosNota.nomeFornecedor || 'Não especificado'}\n` +
+                `💸 *Valor:* R$ ${totalNota.toFixed(2)}\n` +
+                `⚠️ *Vencimento:* ${dadosNota.dataVencimento}\n\n` +
+                `💡 *Pague antes do prazo!*`;
+              await enviarMensagem(numeroTito, msgTitoConta);
+            }
+          }
+        }
+
+        // Resumo para quem enviou a nota
         const linhasResumo = produtosAtualizados
           .map(
             (p) =>
@@ -270,10 +323,14 @@ app.post('/webhook', async (req: Request, res: Response): Promise<void> => {
           )
           .join('\n');
 
-        const resposta = `🧾 *Nota Fiscal Processada com Sucesso!*\n\n📦 *Produtos atualizados (${produtosAtualizados.length} itens):*\n${linhasResumo}\n\n✅ Estoque atualizado automaticamente no sistema!`;
+        let resposta = `🧾 *Nota Fiscal Processada com Sucesso!*\n\n💰 *Total da Nota:* R$ ${totalNota.toFixed(2)}\n📦 *Produtos atualizados (${produtosAtualizados.length} itens):*\n${linhasResumo}\n\n✅ Estoque atualizado automaticamente no sistema!`;
+
+        if (dadosNota.dataVencimento) {
+          resposta += `\n📅 *Vencimento agendado:* ${dadosNota.dataVencimento} (${dadosNota.nomeFornecedor || 'Fornecedor'})`;
+        }
 
         await enviarMensagem(senderNumber, resposta);
-        res.status(200).json({ status: 'nota_processada', produtos: produtosAtualizados });
+        res.status(200).json({ status: 'nota_processada', totalNota, produtos: produtosAtualizados });
         return;
       } catch (err: any) {
         console.error('❌ [WhatsApp] Erro ao processar nota fiscal:', err);
