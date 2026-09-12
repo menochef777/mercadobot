@@ -33,7 +33,10 @@ app.post('/webhook', async (req: Request, res: Response): Promise<void> => {
     }
 
     // Extrai o remetente (número do cliente/usuário)
-    const rawSender = messageData.from || messageData.chatId || messageData.sender?.id || messageData.author || '';
+    const rawSender = (() => {
+      const candidates = [messageData.from, messageData.chatId, messageData.sender?.id, messageData.author, payload.data?.de];
+      return candidates.find(c => c && !String(c).includes('@lid')) || candidates[0] || '';
+    })();
     const senderNumber = formatarNumeroWhatsApp(String(rawSender));
 
     if (!senderNumber) {
