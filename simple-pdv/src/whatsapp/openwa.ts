@@ -44,10 +44,8 @@ export async function enviarMensagem(numero: string, texto: string): Promise<Env
         'Authorization': `Bearer ${apiKey}`,
       },
       body: JSON.stringify({
-        to: chatId,
         chatId: chatId,
-        message: texto,
-        content: texto,
+        text: texto,
       }),
     });
 
