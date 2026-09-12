@@ -14,6 +14,7 @@ import Fornecedor from './routers/fornecedor'
 import Estoque from './routers/estoque'
 import Venda from './routers/venda'
 import Cosmos from './routers/cosmos'
+import WhatsApp from './routers/whatsapp'
 import wellcomeRouter from "./routers/wellcome"
 import cors = require('cors')
 import authenticateToken from "./midleware/authenticate"
@@ -39,6 +40,7 @@ app.use('/RolePermission',authenticateToken, RolePermission)
 app.use('/category', Category)
 app.use('/product', Product)
 app.use('/cosmos', Cosmos)
+app.use('/whatsapp', WhatsApp)
 app.use('/item', Item)
 app.use('/order', Order)
 app.use('/File', File)

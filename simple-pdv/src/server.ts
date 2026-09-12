@@ -3,6 +3,7 @@ import https from 'https';
 import fs from 'fs';
 import { initRelatorioJob } from './jobs/relatorio';
 import { bootstrapAdmin } from './utils/bootstrapAdmin';
+import { configurarWebhook } from './whatsapp/openwa';
 
 console.log('DB:', process.env.DATABASE_URL ? 'conectado' : 'FALTANDO');
 
@@ -22,6 +23,11 @@ bootstrapAdmin();
 
 // Inicializa o agendamento de relatórios diários (18h)
 initRelatorioJob();
+
+// Tenta registrar webhook do WhatsApp no OpenWA
+setTimeout(() => {
+  configurarWebhook();
+}, 2000);
 
 if (fs.existsSync(keyPath) && fs.existsSync(certPath)) {
   const options = {

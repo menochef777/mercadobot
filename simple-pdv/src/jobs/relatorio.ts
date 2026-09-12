@@ -1,7 +1,6 @@
 import cron from 'node-cron';
-import fs from 'fs';
-import path from 'path';
 import { PrismaClient } from '@prisma/client';
+import { enviarMensagem } from '../whatsapp/openwa';
 
 const prisma = new PrismaClient();
 
@@ -64,28 +63,29 @@ export async function gerarRelatorio(): Promise<string> {
       ? fornecedoresAmanha.map((f) => `${f.nome} (${f.produtos || 'Entregas'})`).join(', ')
       : 'Nenhuma visita programada';
 
-    // Formatação da Mensagem
-    const relatorio = `📊 GestorMercado — Resumo do dia (${now.toLocaleDateString('pt-BR')})
-💰 Vendas hoje: R$ ${totalVendas.toFixed(2)} (${vendas.length} vendas)
-👤 Fiado pendente: R$ ${totalFiado.toFixed(2)} (${countFiadoClientes} clientes)
-⚠️ Acabando: ${produtosAcabando}
-🚚 Amanhã (${nomeDiaAmanha}): ${infoFornecedores}`;
+    // Formatação da Mensagem do Relatório
+    const relatorio = `📊 *GestorMercado — Resumo do dia* (${now.toLocaleDateString('pt-BR')})
+💰 *Vendas hoje:* R$ ${totalVendas.toFixed(2)} (${vendas.length} vendas)
+👤 *Fiado pendente:* R$ ${totalFiado.toFixed(2)} (${countFiadoClientes} clientes)
+⚠️ *Acabando:* ${produtosAcabando}
+🚚 *Amanhã (${nomeDiaAmanha}):* ${infoFornecedores}`;
 
-    // Salva em relatorio-hoje.txt na raiz do backend e na raiz do workspace
-    const backendRelatorioPath = path.resolve(__dirname, '../../relatorio-hoje.txt');
-    const rootRelatorioPath = path.resolve(__dirname, '../../../relatorio-hoje.txt');
+    console.log('✅ [Relatório Diário] Conteúdo gerado:\n', relatorio);
 
-    fs.writeFileSync(backendRelatorioPath, relatorio, 'utf-8');
-    try {
-      fs.writeFileSync(rootRelatorioPath, relatorio, 'utf-8');
-    } catch (e) {}
-
-    console.log('✅ Relatório diário gerado e salvo em relatorio-hoje.txt:');
-    console.log(relatorio);
+    // Envio automático via WhatsApp para o número configurado
+    const numeroDestino = process.env.NUMERO_TITO || '5511967634294';
+    console.log(`📱 [Relatório Diário] Enviando via WhatsApp para: ${numeroDestino}...`);
+    
+    const resEnvio = await enviarMensagem(numeroDestino, relatorio);
+    if (resEnvio.success) {
+      console.log(`🎉 [Relatório Diário] Relatório enviado com sucesso via WhatsApp para ${numeroDestino}!`);
+    } else {
+      console.warn(`⚠️ [Relatório Diário] Falha ao enviar para o WhatsApp: ${resEnvio.error}`);
+    }
 
     return relatorio;
   } catch (error) {
-    console.error('Erro ao gerar relatório diário:', error);
+    console.error('Erro ao gerar/enviar relatório diário:', error);
     return 'Erro ao gerar relatório diário.';
   }
 }
@@ -93,7 +93,7 @@ export async function gerarRelatorio(): Promise<string> {
 export function initRelatorioJob() {
   // Executa todo dia às 18:00 (0 18 * * *)
   cron.schedule('0 18 * * *', async () => {
-    console.log('⏰ [Cron] Executando rotina diária das 18h: Geração do Relatório...');
+    console.log('⏰ [Cron] Executando rotina diária das 18h: Geração e envio do Relatório WhatsApp...');
     await gerarRelatorio();
   });
 

@@ -1,0 +1,10 @@
+services:
+  openwa:
+    image: ghcr.io/rmyndharis/openwa:latest
+    ports:
+      - '2785:2785'
+    environment:
+      - DATABASE_URL=${DATABASE_URL}
+      - API_KEY=${OPENWA_API_KEY}
+      - ENGINE_TYPE=whatsapp-web.js
+    restart: unless-stopped
