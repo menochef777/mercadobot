@@ -17,6 +17,7 @@ const app = Router();
  */
 app.post('/webhook', async (req: Request, res: Response): Promise<void> => {
   try {
+    console.log('📩 PAYLOAD COMPLETO:', JSON.stringify(req.body, null, 2));
     const payload = req.body;
 
     // Log resumido do evento recebido
