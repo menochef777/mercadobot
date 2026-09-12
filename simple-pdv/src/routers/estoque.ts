@@ -1,61 +1,16 @@
 import { Router } from 'express';
 import { PrismaClient } from '@prisma/client';
 import EstoqueController from '../controlers/Estoque';
+import { validateBody } from '../midleware/validate';
+import { estoqueUpdateSchema } from '../schemas';
 
 const prisma = new PrismaClient();
 const control = new EstoqueController();
 const app = Router();
 
-/**
- * @swagger
- * tags:
- *   name: Estoque
- *   description: "Gerenciamento e alertas de estoque do mercadinho"
- */
-
-/**
- * @swagger
- * /estoque/alertas:
- *   get:
- *     summary: "Listar produtos com estoque baixo ou no limite (quantidadeAtual <= quantidadeMinima)"
- *     tags: [Estoque]
- *     responses:
- *       200:
- *         description: "Lista de produtos que necessitam de reposição"
- *         content:
- *           application/json:
- *             schema:
- *               type: array
- *               items:
- *                 type: object
- *                 properties:
- *                   productId:
- *                     type: string
- *                   name:
- *                     type: string
- *                   quantidadeAtual:
- *                     type: integer
- *                   quantidadeMinima:
- *                     type: integer
- *                   statusEstoque:
- *                     type: string
- *                     example: "ESTOQUE_BAIXO"
- *                   deficit:
- *                     type: integer
- *                     example: 5
- *       500:
- *         description: "Erro interno"
- */
 app.get('/alertas', control.getAlertas);
 
-/**
- * @swagger
- * /estoque/{productId}:
- *   patch:
- *     summary: "Atualizar ou repor quantidade de estoque do produto"
- *     tags: [Estoque]
- */
-app.patch('/:productId', async (req, res) => {
+app.patch('/:productId', validateBody(estoqueUpdateSchema), async (req, res) => {
   const { productId } = req.params;
   const { quantidadeAtual, quantidadeMinima, adicionar } = req.body;
   try {

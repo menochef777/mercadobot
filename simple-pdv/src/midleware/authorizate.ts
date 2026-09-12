@@ -4,42 +4,75 @@ import { Request, Response, NextFunction } from 'express';
 
 const prisma = new PrismaClient();
 
-interface RequestAuth extends Request {
-    user?: { userId: string }; // Define o tipo do usuário no request
+const getJwtSecret = (): string => {
+    return process.env.JWT_SECRET || 'default_production_secure_key_gestormercado_2026';
+};
+
+export interface AuthenticatedRequest extends Request {
+    user?: { userId: string };
 }
 
-const authenticateToken = (permission: string) => {
-    return async (req: RequestAuth, res: Response, next: NextFunction) => {
-        const authHeader = req.headers['authorization'];
-        const token = authHeader && authHeader.split(' ')[1];
+const authorizePermission = (permission: string) => {
+    return async (req: AuthenticatedRequest, res: Response, next: NextFunction): Promise<void> => {
+        try {
+            const authHeader = req.headers['authorization'];
+            const token = authHeader && authHeader.startsWith('Bearer ') ? authHeader.split(' ')[1] : null;
 
-        if (!token) return res.status(401).send('Token is required');
+            if (!token) {
+                res.status(401).json({ error: 'Token de autenticação é obrigatório.' });
+                return;
+            }
 
-        jwt.verify(token, process.env.JWT_SECRET as string, async (err, decoded) => {
-            if (err) return res.status(403).send('Invalid token');
+            jwt.verify(token, getJwtSecret(), async (err, decoded) => {
+                if (err) {
+                    res.status(403).json({ error: 'Token inválido ou expirado.' });
+                    return;
+                }
 
-            // Decodifica o token e obtém o userId
-            const payload = decoded as { userId: string };
-            const userId = payload.userId;
+                try {
+                    const payload = decoded as { userId: string };
+                    const userId = payload?.userId;
 
-            // Busca o usuário no banco de dados
-            const user = await prisma.user.findUnique({
-                where: { userId },
-                include: { Role: { include: { permissions: { include: { Permission: true } } } } },
+                    if (!userId) {
+                        res.status(403).json({ error: 'Token com estrutura inválida.' });
+                        return;
+                    }
+
+                    const user = await prisma.user.findUnique({
+                        where: { userId },
+                        include: { Role: { include: { permissions: { include: { Permission: true } } } } },
+                    });
+
+                    if (!user) {
+                        res.status(404).json({ error: 'Usuário não encontrado.' });
+                        return;
+                    }
+
+                    // Se a role for Admin, concede acesso irrestrito
+                    if (user.roleName === 'Admin') {
+                        req.user = { userId };
+                        next();
+                        return;
+                    }
+
+                    const hasPermission = user.Role?.permissions.some((rp) => rp.Permission.name === permission);
+                    if (!hasPermission) {
+                        res.status(403).json({ error: `Acesso negado. Permissão necessária: ${permission}` });
+                        return;
+                    }
+
+                    req.user = { userId };
+                    next();
+                } catch (dbErr) {
+                    console.error('Erro na validação de permissão:', dbErr);
+                    res.status(500).json({ error: 'Erro interno ao validar autorização.' });
+                }
             });
-
-            if (!user) return res.status(404).send('User not found');
-
-            // Verifica se o usuário tem a permissão necessária
-            const hasPermission = user.Role?.permissions.some((rp) => rp.Permission.name === permission);
-            if (!hasPermission) return res.status(403).send('Permission denied');
-
-            // Adiciona o usuário ao req para uso posterior
-            req.user = { userId };
-
-            next();
-        });
+        } catch (error) {
+            console.error('Erro no middleware de autorização:', error);
+            res.status(500).json({ error: 'Erro interno no middleware de autorização.' });
+        }
     };
 };
 
-export default authenticateToken;
+export default authorizePermission;

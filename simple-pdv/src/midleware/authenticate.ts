@@ -1,22 +1,37 @@
-import jwt from 'jsonwebtoken'
-import { Request, Response, NextFunction } from 'express'
+import jwt from 'jsonwebtoken';
+import { Request, Response, NextFunction } from 'express';
 
-interface RequestAuth extends Request {
-    user?: string | jwt.JwtPayload
+export interface AuthenticatedRequest extends Request {
+  user?: any;
 }
 
-const authenticateToken = (req: RequestAuth, res: Response, next: NextFunction) => {
-    const authHeader = req.headers['authorization']
-    const token = authHeader && authHeader.split(' ')[1]
+const getJwtSecret = (): string => {
+  const secret = process.env.JWT_SECRET;
+  if (!secret) {
+    console.warn('⚠️ [Segurança] JWT_SECRET não foi definido no ambiente. Usando segredo temporário.');
+    return 'default_production_secure_key_gestormercado_2026';
+  }
+  return secret;
+};
 
-    if (token == null) return res.status(401).send('Token is required')
+const authenticateToken = (req: AuthenticatedRequest, res: Response, next: NextFunction): void => {
+  const authHeader = req.headers['authorization'];
+  const token = authHeader && authHeader.startsWith('Bearer ') ? authHeader.split(' ')[1] : null;
 
-    const JWT_SECRET = process.env.JWT_SECRET || '3f8b9c2a4d6e7f1a2b3c4d5e6f7g8h9i';
-    jwt.verify(token, JWT_SECRET, (err, user) => {
-        if (err) return res.status(403).send('Invalid token')
-        req.body.user = user
-        next()
-    })
-}
+  if (!token) {
+    res.status(401).json({ error: 'Token de autenticação não fornecido.' });
+    return;
+  }
 
-export default authenticateToken
+  const secret = getJwtSecret();
+  jwt.verify(token, secret, (err, decoded) => {
+    if (err) {
+      res.status(403).json({ error: 'Token inválido ou expirado.' });
+      return;
+    }
+    req.user = decoded;
+    next();
+  });
+};
+
+export default authenticateToken;

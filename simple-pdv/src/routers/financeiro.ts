@@ -1,21 +1,12 @@
 import { Router, Request, Response } from 'express';
 import { PrismaClient } from '@prisma/client';
+import { criarEventoVencimento } from '../services/calendar';
+import { validateBody } from '../midleware/validate';
+import { contaPagarCreateSchema } from '../schemas';
 
 const prisma = new PrismaClient();
 const router = Router();
 
-import { criarEventoVencimento } from '../services/calendar';
-
-/**
- * @swagger
- * /financeiro/contas-pagar:
- *   get:
- *     summary: Lista todas as contas a pagar
- *     tags: [Financeiro]
- *     responses:
- *       200:
- *         description: Lista de contas a pagar
- */
 router.get('/contas-pagar', async (req: Request, res: Response): Promise<void> => {
   try {
     const { status } = req.query;
@@ -45,21 +36,9 @@ router.get('/contas-pagar', async (req: Request, res: Response): Promise<void> =
   }
 });
 
-/**
- * @swagger
- * /financeiro/contas-pagar:
- *   post:
- *     summary: Cria uma nova conta a pagar
- *     tags: [Financeiro]
- */
-router.post('/contas-pagar', async (req: Request, res: Response): Promise<void> => {
+router.post('/contas-pagar', validateBody(contaPagarCreateSchema), async (req: Request, res: Response): Promise<void> => {
   try {
     const { nomeFornecedor, valor, dataVencimento, status } = req.body;
-
-    if (!valor || isNaN(Number(valor))) {
-      res.status(400).json({ error: 'Valor é obrigatório e deve ser um número.' });
-      return;
-    }
 
     const nomeFornecedorFinal = nomeFornecedor || 'Fornecedor Avulso';
     const valorNum = Number(valor);
@@ -89,16 +68,15 @@ router.post('/contas-pagar', async (req: Request, res: Response): Promise<void> 
   }
 });
 
-/**
- * @swagger
- * /financeiro/contas-pagar/{id}/pagar:
- *   patch:
- *     summary: Marca uma conta a pagar como PAGO
- *     tags: [Financeiro]
- */
 router.patch('/contas-pagar/:id/pagar', async (req: Request, res: Response): Promise<void> => {
   try {
     const { id } = req.params;
+
+    const contaExist = await prisma.contaPagar.findUnique({ where: { id } });
+    if (!contaExist) {
+      res.status(404).json({ error: 'Conta a pagar não encontrada.' });
+      return;
+    }
 
     const conta = await prisma.contaPagar.update({
       where: { id },

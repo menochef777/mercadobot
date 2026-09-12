@@ -329,6 +329,8 @@
 
 import Product from '../controlers/Product'
 import { Router } from 'express'
+import { validateBody } from '../midleware/validate'
+import { productCreateSchema, productUpdateSchema } from '../schemas'
 
 const control = new Product()
 
@@ -338,8 +340,8 @@ app.get('/', control.get)
 app.get('/barcode/:barcode', control.getByBarcode)
 app.get('/:productId', control.getById)
 app.get('/name/:name', control.getByName)
-app.post('/', control.post)
+app.post('/', validateBody(productCreateSchema), control.post)
 app.delete('/:productId', control.delete)
-app.put('/:productId', control.put)
+app.put('/:productId', validateBody(productUpdateSchema), control.put)
 
 export default app

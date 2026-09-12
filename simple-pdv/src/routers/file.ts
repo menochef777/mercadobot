@@ -1,152 +1,70 @@
-/**
- * @swagger
- * components:
- *   schemas:
- *     File:
- *       type: object
- *       required:
- *         - fileName
- *         - filePath
- *       properties:
- *         fileId:
- *           type: string
- *           description: The unique identifier for the file
- *         fileName:
- *           type: string
- *           description: The name of the file
- *         filePath:
- *           type: string
- *           description: The path where the file is stored
- *         fileType:
- *           type: string
- *           description: The type of the file (e.g., image, document)
- *         uploadedAt:
- *           type: string
- *           format: date-time
- *           description: The date and time the file was uploaded
- */
+import multer from 'multer';
+import path from 'path';
+import { Router, Request, Response } from 'express';
+import { uploadLimiter } from '../midleware/rateLimit';
 
-/**
- * @swagger
- * tags:
- *   name: Files
- *   description: API for managing file uploads and retrievals
- */
+const ALLOWED_MIME_TYPES = [
+  'image/jpeg',
+  'image/png',
+  'image/webp',
+  'image/gif',
+  'application/pdf',
+  'audio/mpeg',
+  'audio/ogg',
+  'audio/wav',
+];
 
-/**
- * @swagger
- * /file:
- *   get:
- *     summary: Retrieve a list of files
- *     tags: [Files]
- *     responses:
- *       200:
- *         description: A list of files
- *         content:
- *           application/json:
- *             schema:
- *               type: array
- *               items:
- *                 $ref: '#/components/schemas/File'
- *       404:
- *         description: No files found
- *       500:
- *         description: Internal server error
- */
+const storage = multer.diskStorage({
+  destination: (req, file, callback) => {
+    callback(null, path.resolve('files'));
+  },
+  filename: (req, file, callback) => {
+    const time = new Date().getTime();
+    // Sanitiza o nome original removendo caracteres de path traversal e caracteres especiais
+    const sanitizedName = file.originalname.replace(/[^a-zA-Z0-9._-]/g, '_');
+    callback(null, `${time}_${sanitizedName}`);
+  },
+});
 
-/**
- * @swagger
- * /file/{fileId}:
- *   get:
- *     summary: Retrieve a file by ID
- *     tags: [Files]
- *     parameters:
- *       - in: path
- *         name: fileId
- *         schema:
- *           type: string
- *         required: true
- *         description: The file ID
- *     responses:
- *       200:
- *         description: A file object
- *         content:
- *           application/json:
- *             schema:
- *               $ref: '#/components/schemas/File'
- *       404:
- *         description: File not found
- *       500:
- *         description: Internal server error
- */
+const fileFilter = (req: Request, file: Express.Multer.File, callback: multer.FileFilterCallback) => {
+  if (ALLOWED_MIME_TYPES.includes(file.mimetype)) {
+    callback(null, true);
+  } else {
+    callback(new Error('Tipo de arquivo não permitido. Apenas imagens, áudios e PDFs são aceitos.'));
+  }
+};
 
-/**
- * @swagger
- * /file:
- *   post:
- *     summary: Upload a new file
- *     tags: [Files]
- *     requestBody:
- *       required: true
- *       content:
- *         multipart/form-data:
- *           schema:
- *             type: object
- *             properties:
- *               file:
- *                 type: string
- *                 format: binary
- *                 description: The file to upload
- *     responses:
- *       201:
- *         description: File uploaded successfully
- *       500:
- *         description: Internal server error
- */
+const upload = multer({
+  storage,
+  limits: {
+    fileSize: 10 * 1024 * 1024, // Limite de 10MB
+  },
+  fileFilter,
+});
 
-/**
- * @swagger
- * /file/{fileId}:
- *   delete:
- *     summary: Delete a file by ID
- *     tags: [Files]
- *     parameters:
- *       - in: path
- *         name: fileId
- *         schema:
- *           type: string
- *         required: true
- *         description: The file ID
- *     responses:
- *       200:
- *         description: File deleted successfully
- *       404:
- *         description: File not found
- *       500:
- *         description: Internal server error
- */
+const route = Router();
 
-import multer from 'multer'
-import path from 'path'
-
-import { Router } from 'express'
-
-const storeage = multer.diskStorage({
-    destination: (req, file, callback) => {
-        callback(null, path.resolve('files'))
-    },
-    filename: (req, file, callback)=> {
-        const time = new Date().getTime()
-        callback(null, `${time}_${file.originalname}`)
+route.post('/upload', uploadLimiter, (req: Request, res: Response, next) => {
+  upload.single('file')(req, res, (err: any) => {
+    if (err instanceof multer.MulterError) {
+      if (err.code === 'LIMIT_FILE_SIZE') {
+        return res.status(400).json({ error: 'Arquivo muito grande. O tamanho máximo permitido é 10MB.' });
+      }
+      return res.status(400).json({ error: `Erro no upload: ${err.message}` });
+    } else if (err) {
+      return res.status(400).json({ error: err.message });
     }
-})
 
-const upload = multer({ storage: storeage })
-const route = Router()
+    if (!req.file) {
+      return res.status(400).json({ error: 'Nenhum arquivo enviado.' });
+    }
 
-route.post('/upload', upload.single('file'), (req, res) => {
-    return res.json(req.file?.filename)
-})
+    return res.status(201).json({
+      filename: req.file.filename,
+      size: req.file.size,
+      mimetype: req.file.mimetype,
+    });
+  });
+});
 
-
-export default route
+export default route;
