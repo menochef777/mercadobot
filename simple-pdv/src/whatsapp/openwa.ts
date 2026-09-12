@@ -21,7 +21,6 @@ export function formatarNumeroWhatsApp(numero: string): string {
 export async function enviarMensagem(numero: string, texto: string): Promise<EnviarMensagemResposta> {
   const openwaUrl = (process.env.OPENWA_URL || 'http://localhost:2785').replace(/\/$/, '');
   const apiKey = process.env.OPENWA_API_KEY || 'sua-chave';
-  const session = process.env.OPENWA_SESSION || 'mercadobot';
 
   const numeroFormatado = formatarNumeroWhatsApp(numero);
   if (!numeroFormatado) {
@@ -29,12 +28,19 @@ export async function enviarMensagem(numero: string, texto: string): Promise<Env
     return { success: false, error: 'Número de telefone inválido' };
   }
 
-  // OpenWA suporta formatos com ou sem @c.us
   const chatId = numeroFormatado.includes('@') ? numeroFormatado : `${numeroFormatado}@c.us`;
-  const endpoint = `${openwaUrl}/api/sessions/${session}/messages/send-text`;
 
   try {
-    console.log(`📤 [OpenWA] Enviando mensagem para ${numeroFormatado} (Sessão: ${session})...`);
+    // Busca o UUID da sessão pelo nome
+    const sessionsResp = await fetch(`${openwaUrl}/api/sessions`, {
+      headers: { 'x-api-key': apiKey, 'Authorization': `Bearer ${apiKey}` }
+    });
+    const sessions = await sessionsResp.json();
+    const session = sessions.find((s: any) => s.name === (process.env.OPENWA_SESSION || 'mercadobot'));
+    const sessionId = session?.id || process.env.OPENWA_SESSION;
+    const endpoint = `${openwaUrl}/api/sessions/${sessionId}/messages/send-text`;
+
+    console.log(`📤 [OpenWA] Enviando mensagem para ${numeroFormatado} (Sessão: ${sessionId})...`);
     
     const response = await fetch(endpoint, {
       method: 'POST',
