@@ -44,7 +44,7 @@ export async function enviarMensagem(numero: string, texto: string): Promise<Env
     const sessionId = session?.id || process.env.OPENWA_SESSION;
     const endpoint = `${openwaUrl}/api/sessions/${sessionId}/messages/send-text`;
 
-    console.log(`📤 [OpenWA] Enviando mensagem para ${numeroFormatado} (Sessão: ${sessionId})...`);
+    console.log(`📤 [OpenWA] Enviando mensagem para ${chatId} (Sessão: ${sessionId})...`);
     
     const response = await fetch(endpoint, {
       method: 'POST',
@@ -66,7 +66,7 @@ export async function enviarMensagem(numero: string, texto: string): Promise<Env
     }
 
     const data = await response.json();
-    console.log(`✅ [OpenWA] Mensagem enviada com sucesso para ${numeroFormatado}!`);
+    console.log(`✅ [OpenWA] Mensagem enviada com sucesso para ${chatId}!`);
     return { success: true, data };
   } catch (error: any) {
     console.error('❌ [OpenWA] Erro de conexão ao enviar mensagem:', error.message || error);
