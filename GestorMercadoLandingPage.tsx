@@ -69,44 +69,63 @@ export default function GestorMercadoLandingPage() {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [dropdownOpen, setDropdownOpen] = useState(false);
 
-  // Injetar Google Fonts requisitadas: Manrope, Cabin, Instrument Serif, Inter
-  useEffect(() => {
-    const fontLinks = [
-      "https://fonts.googleapis.com",
-      "https://fonts.gstatic.com",
-      "https://fonts.googleapis.com/css2?family=Cabin:ital,wght@0,400..700;1,400..700&family=Instrument+Serif:ital@0;1&family=Inter:wght@300;400;500;600;700&family=Manrope:wght@400;500;600;700;800&display=swap"
-    ];
+  // FormSubmit State
+  const [contactName, setContactName] = useState('');
+  const [contactEmail, setContactEmail] = useState('');
+  const [contactPhone, setContactPhone] = useState('');
+  const [contactMessage, setContactMessage] = useState('');
+  const [contactSubmitting, setContactSubmitting] = useState(false);
+  const [contactSuccess, setContactSuccess] = useState(false);
+  const [contactError, setContactError] = useState<string | null>(null);
 
-    const linkEl1 = document.createElement("link");
-    linkEl1.rel = "preconnect";
-    linkEl1.href = fontLinks[0];
-    document.head.appendChild(linkEl1);
+  const handleContactSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setContactSubmitting(true);
+    setContactError(null);
+    setContactSuccess(false);
 
-    const linkEl2 = document.createElement("link");
-    linkEl2.rel = "preconnect";
-    linkEl2.href = fontLinks[1];
-    linkEl2.crossOrigin = "anonymous";
-    document.head.appendChild(linkEl2);
+    try {
+      const endpoint = `https://formsubmit.co/ajax/mercadobot.suporte@gmail.com`;
+      const res = await fetch(endpoint, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Accept': 'application/json',
+        },
+        body: JSON.stringify({
+          nome: contactName,
+          email: contactEmail,
+          whatsapp: contactPhone,
+          mensagem: contactMessage,
+          _subject: `Novo Contato via GestorMercado de ${contactName}`,
+          _template: 'table',
+          _captcha: 'false',
+          _honey: '',
+        }),
+      });
 
-    const linkEl3 = document.createElement("link");
-    linkEl3.rel = "stylesheet";
-    linkEl3.href = fontLinks[2];
-    document.head.appendChild(linkEl3);
-
-    return () => {
-      document.head.removeChild(linkEl1);
-      document.head.removeChild(linkEl2);
-      document.head.removeChild(linkEl3);
-    };
-  }, []);
+      const data = await res.json();
+      if (res.ok || data.success === 'true' || data.success === true) {
+        setContactSuccess(true);
+        setContactName('');
+        setContactEmail('');
+        setContactPhone('');
+        setContactMessage('');
+      } else {
+        setContactError(data.message || 'Erro ao enviar mensagem. Tente novamente.');
+      }
+    } catch (err) {
+      console.error('Erro ao enviar contato FormSubmit:', err);
+      setContactError('Não foi possível conectar ao serviço de envio. Verifique sua conexão.');
+    } finally {
+      setContactSubmitting(false);
+    }
+  };
 
   return (
     <div className="relative min-h-screen w-full bg-black text-white font-['Inter'] antialiased selection:bg-[#4ade80] selection:text-[#14532d] overflow-x-hidden">
-      {/* ========================================================================= */}
-      {/* 1. SEÇÃO HERO COM VÍDEO EM TELA CHEIA (SEM OVERLAY) */}
-      {/* ========================================================================= */}
+      {/* 1. HERO COM VÍDEO */}
       <section className="relative min-h-screen w-full flex flex-col justify-between overflow-hidden">
-        {/* Vídeo HTML5 em tela cheia de fundo */}
         <video
           autoPlay
           loop
@@ -116,11 +135,7 @@ export default function GestorMercadoLandingPage() {
           src="https://d8j0ntlcm91z4.cloudfront.net/user_38xzZboKViGWJOttwIXH07lWA1P/hf_20260210_031346_d87182fb-b0af-4273-84d1-c6fd17d6bf0f.mp4"
         />
 
-        {/* ========================================================================= */}
-        {/* NAVBAR */}
-        {/* ========================================================================= */}
         <header className="relative z-20 w-full flex items-center justify-between px-6 md:px-[120px] py-[16px] bg-transparent">
-          {/* Logo Esquerda */}
           <a
             href="#inicio"
             className="flex items-center gap-2.5 text-white no-underline group focus:outline-none"
@@ -133,15 +148,10 @@ export default function GestorMercadoLandingPage() {
             </span>
           </a>
 
-          {/* Links Centro (Desktop) */}
           <nav className="hidden md:flex items-center gap-8 font-['Manrope'] text-[15px] font-medium text-white/90">
-            <a
-              href="#inicio"
-              className="transition-colors hover:text-[#4ade80] drop-shadow-sm"
-            >
+            <a href="#inicio" className="transition-colors hover:text-[#4ade80] drop-shadow-sm">
               Início
             </a>
-
             <div className="relative">
               <button
                 type="button"
@@ -149,163 +159,54 @@ export default function GestorMercadoLandingPage() {
                 className="flex items-center gap-1.5 transition-colors hover:text-[#4ade80] drop-shadow-sm cursor-pointer focus:outline-none"
               >
                 Funcionalidades
-                <ChevronDownIcon
-                  className={`w-4 h-4 transition-transform duration-200 ${
-                    dropdownOpen ? "rotate-180 text-[#4ade80]" : ""
-                  }`}
-                />
+                <ChevronDownIcon className={`w-4 h-4 transition-transform duration-200 ${dropdownOpen ? "rotate-180 text-[#4ade80]" : ""}`} />
               </button>
-
-              {/* Dropdown Menu */}
               {dropdownOpen && (
                 <div
                   onMouseLeave={() => setDropdownOpen(false)}
                   className="absolute top-full left-0 mt-3 w-56 p-2 rounded-xl bg-[#14532d]/90 backdrop-blur-xl border border-[#4ade80]/30 shadow-2xl z-50 flex flex-col gap-1"
                 >
-                  <a
-                    href="#funcionalidades"
-                    onClick={() => setDropdownOpen(false)}
-                    className="flex items-center gap-2 px-3 py-2 text-sm rounded-lg hover:bg-[#4ade80]/20 text-white hover:text-[#4ade80] transition-colors"
-                  >
+                  <a href="#funcionalidades" onClick={() => setDropdownOpen(false)} className="flex items-center gap-2 px-3 py-2 text-sm rounded-lg hover:bg-[#4ade80]/20 text-white hover:text-[#4ade80] transition-colors">
                     <BookOpenIcon className="w-4 h-4 text-[#4ade80]" />
                     Fiado Digital
                   </a>
-                  <a
-                    href="#funcionalidades"
-                    onClick={() => setDropdownOpen(false)}
-                    className="flex items-center gap-2 px-3 py-2 text-sm rounded-lg hover:bg-[#4ade80]/20 text-white hover:text-[#4ade80] transition-colors"
-                  >
+                  <a href="#funcionalidades" onClick={() => setDropdownOpen(false)} className="flex items-center gap-2 px-3 py-2 text-sm rounded-lg hover:bg-[#4ade80]/20 text-white hover:text-[#4ade80] transition-colors">
                     <PackageIcon className="w-4 h-4 text-[#4ade80]" />
                     Estoque Inteligente
                   </a>
-                  <a
-                    href="#funcionalidades"
-                    onClick={() => setDropdownOpen(false)}
-                    className="flex items-center gap-2 px-3 py-2 text-sm rounded-lg hover:bg-[#4ade80]/20 text-white hover:text-[#4ade80] transition-colors"
-                  >
+                  <a href="#funcionalidades" onClick={() => setDropdownOpen(false)} className="flex items-center gap-2 px-3 py-2 text-sm rounded-lg hover:bg-[#4ade80]/20 text-white hover:text-[#4ade80] transition-colors">
                     <TruckIcon className="w-4 h-4 text-[#4ade80]" />
                     Fornecedores & Entregas
                   </a>
                 </div>
               )}
             </div>
-
-            <a
-              href="#depoimentos"
-              className="transition-colors hover:text-[#4ade80] drop-shadow-sm"
-            >
-              Depoimentos
+            <a href="#como-funciona" className="transition-colors hover:text-[#4ade80] drop-shadow-sm">
+              Como funciona
             </a>
-            <a
-              href="#contato"
-              className="transition-colors hover:text-[#4ade80] drop-shadow-sm"
-            >
+            <a href="#contato" className="transition-colors hover:text-[#4ade80] drop-shadow-sm">
               Contato
             </a>
           </nav>
 
-          {/* Botões Direita (Desktop) */}
           <div className="hidden md:flex items-center gap-3">
-            <button
-              type="button"
-              className="font-['Cabin'] font-semibold text-[15px] px-5 py-2.5 bg-white text-black border border-gray-300 rounded-[8px] hover:bg-gray-100 transition-all duration-200 shadow-sm active:scale-95 cursor-pointer"
+            <a
+              href="/dashboard"
+              className="font-['Cabin'] font-semibold text-[15px] px-5 py-2.5 bg-white text-black border border-gray-300 rounded-[8px] hover:bg-gray-100 transition-all duration-200 shadow-sm active:scale-95 text-center"
             >
               Entrar
-            </button>
-            <button
-              type="button"
-              className="font-['Cabin'] font-bold text-[15px] px-5 py-2.5 bg-[#4ade80] text-[#14532d] rounded-[8px] hover:bg-[#3ec972] transition-all duration-200 shadow-md hover:shadow-[#4ade80]/30 active:scale-95 cursor-pointer"
+            </a>
+            <a
+              href="/dashboard"
+              className="font-['Cabin'] font-bold text-[15px] px-5 py-2.5 bg-[#4ade80] text-[#14532d] rounded-[8px] hover:bg-[#3ec972] transition-all duration-200 shadow-md hover:shadow-[#4ade80]/30 active:scale-95 text-center"
             >
               Começar grátis
-            </button>
+            </a>
           </div>
-
-          {/* Botão Mobile (Hambúrguer) */}
-          <button
-            type="button"
-            onClick={() => setMobileMenuOpen(true)}
-            className="md:hidden p-2 rounded-lg bg-black/40 backdrop-blur-sm border border-white/20 text-white hover:bg-black/60 focus:outline-none"
-            aria-label="Abrir Menu"
-          >
-            <MenuIcon className="w-6 h-6" />
-          </button>
         </header>
 
-        {/* ========================================================================= */}
-        {/* MENU MOBILE FULLSCREEN PRETO */}
-        {/* ========================================================================= */}
-        {mobileMenuOpen && (
-          <div className="fixed inset-0 z-50 bg-black/95 backdrop-blur-2xl flex flex-col justify-between p-6 md:hidden animate-in fade-in duration-200">
-            <div className="flex items-center justify-between border-b border-neutral-800 pb-4">
-              <div className="flex items-center gap-2.5">
-                <StoreIcon className="w-6 h-6 text-[#4ade80]" />
-                <span className="font-['Manrope'] font-bold text-xl text-white">
-                  GestorMercado
-                </span>
-              </div>
-              <button
-                type="button"
-                onClick={() => setMobileMenuOpen(false)}
-                className="p-2 rounded-lg bg-neutral-900 border border-neutral-700 text-white hover:bg-neutral-800"
-                aria-label="Fechar Menu"
-              >
-                <XIcon className="w-6 h-6" />
-              </button>
-            </div>
-
-            <nav className="flex flex-col gap-6 font-['Manrope'] text-2xl font-bold text-neutral-200 my-auto">
-              <a
-                href="#inicio"
-                onClick={() => setMobileMenuOpen(false)}
-                className="hover:text-[#4ade80] transition-colors"
-              >
-                Início
-              </a>
-              <a
-                href="#funcionalidades"
-                onClick={() => setMobileMenuOpen(false)}
-                className="hover:text-[#4ade80] transition-colors"
-              >
-                Funcionalidades
-              </a>
-              <a
-                href="#depoimentos"
-                onClick={() => setMobileMenuOpen(false)}
-                className="hover:text-[#4ade80] transition-colors"
-              >
-                Depoimentos
-              </a>
-              <a
-                href="#contato"
-                onClick={() => setMobileMenuOpen(false)}
-                className="hover:text-[#4ade80] transition-colors"
-              >
-                Contato
-              </a>
-            </nav>
-
-            <div className="flex flex-col gap-3 pt-6 border-t border-neutral-800">
-              <button
-                type="button"
-                className="w-full font-['Cabin'] font-bold py-3.5 bg-white text-black rounded-[8px] text-center"
-              >
-                Entrar
-              </button>
-              <button
-                type="button"
-                className="w-full font-['Cabin'] font-bold py-3.5 bg-[#4ade80] text-[#14532d] rounded-[8px] text-center shadow-lg shadow-[#4ade80]/20"
-              >
-                Começar grátis
-              </button>
-            </div>
-          </div>
-        )}
-
-        {/* ========================================================================= */}
-        {/* HERO CENTRALIZADO */}
-        {/* ========================================================================= */}
+        {/* HERO CONTENT */}
         <div className="relative z-10 flex flex-col items-center text-center px-4 sm:px-6 max-w-5xl mx-auto mt-32 pb-24">
-          {/* Tagline Glassmorphism */}
           <div className="inline-flex items-center gap-2.5 h-[38px] px-3.5 rounded-[10px] bg-[rgba(20,83,45,0.4)] backdrop-blur-md border border-[rgba(74,222,128,0.5)] shadow-lg shadow-black/20 mb-8 transition-transform hover:scale-105">
             <span className="font-['Manrope'] font-bold text-xs px-2 py-0.5 rounded-[6px] bg-[#4ade80] text-[#14532d] tracking-wide uppercase">
               Novo
@@ -315,51 +216,35 @@ export default function GestorMercadoLandingPage() {
             </span>
           </div>
 
-          {/* Headline */}
           <h1 className="font-['Instrument_Serif'] text-5xl sm:text-7xl md:text-[96px] text-white leading-[1.1] tracking-tight max-w-4xl drop-shadow-md mb-6">
             Gerencie seu mercadinho com facilidade{" "}
             <span className="italic font-normal text-[#4ade80]">e</span> sem papel
           </h1>
 
-          {/* Subtexto */}
           <p className="font-['Inter'] text-[16px] sm:text-[18px] text-white/70 max-w-[662px] leading-relaxed mb-10 drop-shadow-sm">
             Controle fiado, estoque e fornecedores pelo celular. Relatório automático todo dia. Sem complicação, sem planilha.
           </p>
 
-          {/* Botões CTA */}
           <div className="flex flex-col sm:flex-row items-center justify-center gap-4 w-full sm:w-auto">
-            <button
-              type="button"
-              className="w-full sm:w-auto font-['Cabin'] font-bold text-[16px] px-8 py-3.5 bg-[#4ade80] text-[#14532d] rounded-[10px] hover:bg-[#3ec972] transition-all duration-200 shadow-xl shadow-[#4ade80]/20 hover:shadow-[#4ade80]/40 active:scale-95 cursor-pointer"
+            <a
+              href="#funcionalidades"
+              className="w-full sm:w-auto font-['Cabin'] font-bold text-[16px] px-8 py-3.5 bg-[#4ade80] text-[#14532d] rounded-[10px] hover:bg-[#3ec972] transition-all duration-200 shadow-xl shadow-[#4ade80]/20 hover:shadow-[#4ade80]/40 active:scale-95 text-center"
             >
               Ver demonstração
-            </button>
-            <button
-              type="button"
-              className="w-full sm:w-auto font-['Cabin'] font-semibold text-[16px] px-8 py-3.5 bg-[#14532d] text-[#f6f7f9] border border-[#4ade80]/40 rounded-[10px] hover:bg-[#196537] hover:border-[#4ade80]/70 transition-all duration-200 shadow-lg active:scale-95 cursor-pointer"
+            </a>
+            <a
+              href="/dashboard"
+              className="w-full sm:w-auto font-['Cabin'] font-semibold text-[16px] px-8 py-3.5 bg-[#14532d] text-[#f6f7f9] border border-[#4ade80]/40 rounded-[10px] hover:bg-[#196537] hover:border-[#4ade80]/70 transition-all duration-200 shadow-lg active:scale-95 text-center"
             >
               Começar agora
-            </button>
-          </div>
-        </div>
-
-        {/* Espaçador inferior suave */}
-        <div className="relative z-10 w-full flex justify-center pb-6">
-          <div className="w-6 h-10 rounded-full border-2 border-white/30 flex items-start justify-center p-1">
-            <div className="w-1.5 h-2.5 rounded-full bg-[#4ade80] animate-bounce" />
+            </a>
           </div>
         </div>
       </section>
 
-      {/* ========================================================================= */}
-      {/* 2. SEÇÃO DE FUNCIONALIDADES (FUNDO BRANCO) */}
-      {/* ========================================================================= */}
-      <section
-        id="funcionalidades"
-        className="relative z-20 w-full bg-white text-gray-900 py-24 px-6 md:px-[120px]"
-      >
+      {/* 2. FUNCIONALIDADES */}
+      <section id="funcionalidades" className="relative z-20 w-full bg-white text-gray-900 py-24 px-6 md:px-[120px]">
         <div className="max-w-7xl mx-auto">
-          {/* Cabeçalho da Seção */}
           <div className="text-center max-w-2xl mx-auto mb-16">
             <span className="font-['Manrope'] font-bold text-xs uppercase tracking-widest text-[#14532d] bg-[#4ade80]/20 px-3.5 py-1.5 rounded-full inline-block mb-4">
               Recursos Essenciais
@@ -372,211 +257,166 @@ export default function GestorMercadoLandingPage() {
             </p>
           </div>
 
-          {/* 3 Cards Lado a Lado */}
           <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
-            {/* Card 1: Fiado Digital */}
             <div className="group relative p-8 rounded-2xl bg-gray-50 border border-gray-200/80 hover:border-[#4ade80] hover:bg-white transition-all duration-300 shadow-sm hover:shadow-xl hover:-translate-y-1">
               <div className="w-14 h-14 rounded-xl bg-[#4ade80]/15 border border-[#4ade80]/30 flex items-center justify-center text-[#14532d] mb-6 group-hover:scale-110 group-hover:bg-[#4ade80] group-hover:text-[#14532d] transition-all duration-300">
                 <BookOpenIcon className="w-7 h-7" />
               </div>
-              <h3 className="font-['Manrope'] font-bold text-2xl text-gray-900 mb-3">
-                Fiado digital
-              </h3>
+              <h3 className="font-['Manrope'] font-bold text-2xl text-gray-900 mb-3">Fiado digital</h3>
               <p className="font-['Inter'] text-gray-600 text-[15px] leading-relaxed mb-6">
-                Cadastre clientes, anote débitos pelo WhatsApp ou celular e dê baixa com um clique. Notificações automáticas de cobrança sem constrangimento.
+                Cadastre clientes, anote débitos pelo WhatsApp ou celular e dê baixa com um clique.
               </p>
-              <ul className="space-y-2.5 font-['Inter'] text-sm text-gray-600 border-t border-gray-200/60 pt-4">
-                <li className="flex items-center gap-2">
-                  <CheckCircleIcon className="w-4 h-4 text-[#14532d]" />
-                  Histórico de compras por cliente
-                </li>
-                <li className="flex items-center gap-2">
-                  <CheckCircleIcon className="w-4 h-4 text-[#14532d]" />
-                  Quitação em 1 clique pelo celular
-                </li>
-              </ul>
             </div>
-
-            {/* Card 2: Estoque Inteligente */}
             <div className="group relative p-8 rounded-2xl bg-gray-50 border border-gray-200/80 hover:border-[#4ade80] hover:bg-white transition-all duration-300 shadow-sm hover:shadow-xl hover:-translate-y-1">
               <div className="w-14 h-14 rounded-xl bg-[#4ade80]/15 border border-[#4ade80]/30 flex items-center justify-center text-[#14532d] mb-6 group-hover:scale-110 group-hover:bg-[#4ade80] group-hover:text-[#14532d] transition-all duration-300">
                 <PackageIcon className="w-7 h-7" />
               </div>
-              <h3 className="font-['Manrope'] font-bold text-2xl text-gray-900 mb-3">
-                Estoque inteligente
-              </h3>
+              <h3 className="font-['Manrope'] font-bold text-2xl text-gray-900 mb-3">Estoque inteligente</h3>
               <p className="font-['Inter'] text-gray-600 text-[15px] leading-relaxed mb-6">
-                Defina quantidades mínimas para cada produto e receba alertas automáticos antes do produto acabar na prateleira.
+                Defina quantidades mínimas para cada produto e receba alertas automáticos de reposição.
               </p>
-              <ul className="space-y-2.5 font-['Inter'] text-sm text-gray-600 border-t border-gray-200/60 pt-4">
-                <li className="flex items-center gap-2">
-                  <CheckCircleIcon className="w-4 h-4 text-[#14532d]" />
-                  Alerta de produtos no limite
-                </li>
-                <li className="flex items-center gap-2">
-                  <CheckCircleIcon className="w-4 h-4 text-[#14532d]" />
-                  Sugestão automática de reposição
-                </li>
-              </ul>
             </div>
-
-            {/* Card 3: Fornecedores */}
             <div className="group relative p-8 rounded-2xl bg-gray-50 border border-gray-200/80 hover:border-[#4ade80] hover:bg-white transition-all duration-300 shadow-sm hover:shadow-xl hover:-translate-y-1">
               <div className="w-14 h-14 rounded-xl bg-[#4ade80]/15 border border-[#4ade80]/30 flex items-center justify-center text-[#14532d] mb-6 group-hover:scale-110 group-hover:bg-[#4ade80] group-hover:text-[#14532d] transition-all duration-300">
                 <TruckIcon className="w-7 h-7" />
               </div>
-              <h3 className="font-['Manrope'] font-bold text-2xl text-gray-900 mb-3">
-                Fornecedores
-              </h3>
+              <h3 className="font-['Manrope'] font-bold text-2xl text-gray-900 mb-3">Fornecedores</h3>
               <p className="font-['Inter'] text-gray-600 text-[15px] leading-relaxed mb-6">
-                Controle dias de visita, histórico da última entrega e valores pagos. Nunca mais seja pego de surpresa pelo entregador.
+                Controle dias de visita, histórico da última entrega e valores pagos.
               </p>
-              <ul className="space-y-2.5 font-['Inter'] text-sm text-gray-600 border-t border-gray-200/60 pt-4">
-                <li className="flex items-center gap-2">
-                  <CheckCircleIcon className="w-4 h-4 text-[#14532d]" />
-                  Agenda semanal de visitas
-                </li>
-                <li className="flex items-center gap-2">
-                  <CheckCircleIcon className="w-4 h-4 text-[#14532d]" />
-                  Controle de preços e faturas
-                </li>
-              </ul>
             </div>
           </div>
         </div>
       </section>
 
-      {/* ========================================================================= */}
-      {/* 3. SEÇÃO COMO FUNCIONA (FUNDO CINZA CLARO) */}
-      {/* ========================================================================= */}
-      <section
-        id="como-funciona"
-        className="relative z-20 w-full bg-gray-100 text-gray-900 py-24 px-6 md:px-[120px] border-y border-gray-200/80"
-      >
-        <div className="max-w-7xl mx-auto">
-          {/* Cabeçalho da Seção */}
-          <div className="text-center max-w-2xl mx-auto mb-16">
-            <span className="font-['Manrope'] font-bold text-xs uppercase tracking-widest text-[#14532d] bg-[#4ade80]/30 px-3.5 py-1.5 rounded-full inline-block mb-4">
-              Passo a Passo
-            </span>
-            <h2 className="font-['Instrument_Serif'] text-4xl sm:text-5xl text-gray-950 leading-tight mb-4">
-              Como funciona
+      {/* 3. CONTATO COM FORMSUBMIT */}
+      <section id="contato" className="relative z-20 w-full bg-[#0a0f0d] text-white py-20 px-6 md:px-[120px] border-t border-neutral-900">
+        <div className="max-w-4xl mx-auto">
+          <div className="text-center mb-12">
+            <div className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-[#14532d]/40 border border-[#4ade80]/30 text-[#4ade80] text-xs font-semibold uppercase tracking-wider mb-4">
+              ✉️ Fale com Nossos Especialistas
+            </div>
+            <h2 className="font-['Instrument_Serif'] text-3xl sm:text-5xl text-white mb-4">
+              Tire dúvidas ou solicite uma demonstração
             </h2>
-            <p className="font-['Inter'] text-gray-600 text-base sm:text-lg">
-              Comece a usar em menos de 5 minutos, direto pelo celular, sem treinamento complicado.
+            <p className="font-['Inter'] text-neutral-400 text-sm sm:text-base max-w-xl mx-auto">
+              Envie sua mensagem. Nosso time entrará em contato direto com você pelo WhatsApp ou e-mail.
             </p>
           </div>
 
-          {/* 3 Passos Numerados */}
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-8 relative">
-            {/* Passo 1 */}
-            <div className="relative p-8 rounded-2xl bg-white border border-gray-200 shadow-sm flex flex-col justify-between transition-all duration-300 hover:shadow-lg hover:-translate-y-1">
-              <div>
-                <div className="flex items-center justify-between mb-6">
-                  <span className="font-['Manrope'] font-extrabold text-5xl sm:text-6xl text-[#4ade80] tracking-tighter">
-                    01
-                  </span>
-                  <div className="w-10 h-10 rounded-xl bg-[#14532d] text-[#4ade80] flex items-center justify-center font-['Manrope'] font-bold text-sm">
-                    1º
-                  </div>
+          <div className="p-8 sm:p-10 rounded-3xl bg-white/[0.03] border border-white/10 shadow-2xl backdrop-blur-xl">
+            {contactSuccess ? (
+              <div className="p-8 rounded-2xl bg-[#14532d]/50 border border-[#4ade80]/40 text-center flex flex-col items-center gap-3">
+                <div className="w-14 h-14 rounded-full bg-[#4ade80] text-[#14532d] flex items-center justify-center font-bold text-2xl shadow-lg shadow-[#4ade80]/20">
+                  ✓
                 </div>
-                <h3 className="font-['Manrope'] font-bold text-xl text-gray-900 mb-3 leading-snug">
-                  Cadastre seus produtos e clientes
-                </h3>
-                <p className="font-['Inter'] text-gray-600 text-[15px] leading-relaxed">
-                  Adicione seus itens em segundos pelo celular, configure o estoque mínimo e cadastre os clientes habituais do seu comércio.
+                <h3 className="font-['Manrope'] font-bold text-2xl text-white">Mensagem Enviada com Sucesso!</h3>
+                <p className="font-['Inter'] text-sm text-neutral-300 max-w-md">
+                  Obrigado pelo contato! Recebemos suas informações com segurança e responderemos o mais breve possível.
                 </p>
+                <button
+                  type="button"
+                  onClick={() => setContactSuccess(false)}
+                  className="mt-4 px-6 py-2.5 rounded-xl bg-white/10 hover:bg-white/20 text-white text-xs font-semibold transition-colors"
+                >
+                  Enviar outra mensagem
+                </button>
               </div>
-            </div>
+            ) : (
+              <form onSubmit={handleContactSubmit} className="flex flex-col gap-5">
+                {contactError && (
+                  <div className="p-3.5 rounded-xl bg-red-950/80 border border-red-500/50 text-red-200 text-xs font-medium">
+                    ⚠️ {contactError}
+                  </div>
+                )}
+                <input type="text" name="_honey" style={{ display: 'none' }} tabIndex={-1} autoComplete="off" />
 
-            {/* Passo 2 */}
-            <div className="relative p-8 rounded-2xl bg-white border border-gray-200 shadow-sm flex flex-col justify-between transition-all duration-300 hover:shadow-lg hover:-translate-y-1">
-              <div>
-                <div className="flex items-center justify-between mb-6">
-                  <span className="font-['Manrope'] font-extrabold text-5xl sm:text-6xl text-[#4ade80] tracking-tighter">
-                    02
-                  </span>
-                  <div className="w-10 h-10 rounded-xl bg-[#14532d] text-[#4ade80] flex items-center justify-center font-['Manrope'] font-bold text-sm">
-                    2º
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
+                  <div>
+                    <label className="block text-xs font-['Manrope'] font-semibold text-neutral-300 mb-1.5">
+                      Seu Nome Completo *
+                    </label>
+                    <input
+                      type="text"
+                      required
+                      placeholder="Ex: Márcio Silva"
+                      value={contactName}
+                      onChange={(e) => setContactName(e.target.value)}
+                      className="w-full px-4 py-3 rounded-xl bg-black/60 border border-white/15 text-white placeholder:text-neutral-600 focus:outline-none focus:border-[#4ade80] text-sm transition-colors"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-xs font-['Manrope'] font-semibold text-neutral-300 mb-1.5">
+                      WhatsApp ou Telefone *
+                    </label>
+                    <input
+                      type="tel"
+                      required
+                      placeholder="(81) 99999-9999"
+                      value={contactPhone}
+                      onChange={(e) => setContactPhone(e.target.value)}
+                      className="w-full px-4 py-3 rounded-xl bg-black/60 border border-white/15 text-white placeholder:text-neutral-600 focus:outline-none focus:border-[#4ade80] text-sm transition-colors"
+                    />
                   </div>
                 </div>
-                <h3 className="font-['Manrope'] font-bold text-xl text-gray-900 mb-3 leading-snug">
-                  Registre vendas, fiado e entregas
-                </h3>
-                <p className="font-['Inter'] text-gray-600 text-[15px] leading-relaxed">
-                  Faça vendas no caixa, marque débitos no fiado com 1 toque e receba mercadorias dos fornecedores mantendo o estoque atualizado.
-                </p>
-              </div>
-            </div>
 
-            {/* Passo 3 */}
-            <div className="relative p-8 rounded-2xl bg-white border border-gray-200 shadow-sm flex flex-col justify-between transition-all duration-300 hover:shadow-lg hover:-translate-y-1">
-              <div>
-                <div className="flex items-center justify-between mb-6">
-                  <span className="font-['Manrope'] font-extrabold text-5xl sm:text-6xl text-[#4ade80] tracking-tighter">
-                    03
-                  </span>
-                  <div className="w-10 h-10 rounded-xl bg-[#14532d] text-[#4ade80] flex items-center justify-center font-['Manrope'] font-bold text-sm">
-                    3º
-                  </div>
+                <div>
+                  <label className="block text-xs font-['Manrope'] font-semibold text-neutral-300 mb-1.5">
+                    E-mail para Contato *
+                  </label>
+                  <input
+                    type="email"
+                    required
+                    placeholder="seu.email@exemplo.com"
+                    value={contactEmail}
+                    onChange={(e) => setContactEmail(e.target.value)}
+                    className="w-full px-4 py-3 rounded-xl bg-black/60 border border-white/15 text-white placeholder:text-neutral-600 focus:outline-none focus:border-[#4ade80] text-sm transition-colors"
+                  />
                 </div>
-                <h3 className="font-['Manrope'] font-bold text-xl text-gray-900 mb-3 leading-snug">
-                  Receba o relatório todo dia no WhatsApp
-                </h3>
-                <p className="font-['Inter'] text-gray-600 text-[15px] leading-relaxed">
-                  Fechamento de caixa diário, lista de fiados a receber e alertas de compras que precisam ser feitas, direto no seu WhatsApp.
-                </p>
-              </div>
-            </div>
+
+                <div>
+                  <label className="block text-xs font-['Manrope'] font-semibold text-neutral-300 mb-1.5">
+                    Nome do Mercadinho ou Mensagem *
+                  </label>
+                  <textarea
+                    required
+                    rows={4}
+                    placeholder="Conte um pouco sobre o seu comércio ou as dúvidas que você tem..."
+                    value={contactMessage}
+                    onChange={(e) => setContactMessage(e.target.value)}
+                    className="w-full px-4 py-3 rounded-xl bg-black/60 border border-white/15 text-white placeholder:text-neutral-600 focus:outline-none focus:border-[#4ade80] text-sm transition-colors resize-none"
+                  />
+                </div>
+
+                <div className="flex items-center justify-between flex-wrap gap-4 mt-2">
+                  <span className="text-[11px] text-neutral-500 flex items-center gap-1.5">
+                    🔒 Envio seguro e protegido contra spam (FormSubmit SSL)
+                  </span>
+                  <button
+                    type="submit"
+                    disabled={contactSubmitting}
+                    className="font-['Cabin'] font-bold text-sm px-8 py-3.5 bg-[#4ade80] text-[#14532d] rounded-xl hover:bg-[#3ec972] transition-all duration-200 shadow-lg shadow-[#4ade80]/20 active:scale-95 disabled:opacity-50 cursor-pointer"
+                  >
+                    {contactSubmitting ? 'Enviando mensagem...' : 'Enviar Mensagem'}
+                  </button>
+                </div>
+              </form>
+            )}
           </div>
         </div>
       </section>
 
-      {/* ========================================================================= */}
-      {/* 4. SEÇÃO DE CTA FINAL */}
-      {/* ========================================================================= */}
-      <section className="relative z-20 w-full bg-white text-gray-900 py-16 px-6 md:px-[120px]">
-        <div className="max-w-7xl mx-auto">
-          {/* Banner de Chamada Final */}
-          <div className="p-8 md:p-12 rounded-3xl bg-[#14532d] text-white flex flex-col md:flex-row items-center justify-between gap-8 shadow-2xl relative overflow-hidden">
-            <div className="absolute top-0 right-0 -mr-16 -mt-16 w-64 h-64 bg-[#4ade80]/10 rounded-full blur-3xl pointer-events-none" />
-            <div className="relative z-10 max-w-xl">
-              <h3 className="font-['Instrument_Serif'] text-3xl sm:text-4xl text-white mb-2">
-                Pronto para modernizar seu mercadinho?
-              </h3>
-              <p className="font-['Inter'] text-white/80 text-base">
-                Junte-se a centenas de comerciantes que economizam tempo e aumentam seus lucros com o GestorMercado.
-              </p>
-            </div>
-            <div className="relative z-10 flex items-center gap-4 w-full md:w-auto">
-              <button
-                type="button"
-                className="w-full md:w-auto font-['Cabin'] font-bold text-[16px] px-8 py-3.5 bg-[#4ade80] text-[#14532d] rounded-[10px] hover:bg-[#3ec972] transition-all duration-200 shadow-lg cursor-pointer text-center"
-              >
-                Começar gratuitamente
-              </button>
-            </div>
-          </div>
-        </div>
-      </section>
-
-      {/* ========================================================================= */}
       {/* FOOTER */}
-      {/* ========================================================================= */}
       <footer className="w-full bg-neutral-950 border-t border-neutral-800 py-12 px-6 md:px-[120px] text-neutral-400 text-sm">
         <div className="max-w-7xl mx-auto flex flex-col md:flex-row items-center justify-between gap-6">
           <div className="flex items-center gap-2">
             <StoreIcon className="w-5 h-5 text-[#4ade80]" />
-            <span className="font-['Manrope'] font-bold text-base text-white">
-              GestorMercado
-            </span>
+            <span className="font-['Manrope'] font-bold text-base text-white">GestorMercado</span>
           </div>
           <p className="text-center md:text-left text-xs text-neutral-500">
-            © {new Date().getFullYear()} GestorMercado. Todos os direitos reservados. Feito para pequenos comércios e mercadinhos.
+            © {new Date().getFullYear()} GestorMercado. Todos os direitos reservados.
           </p>
           <div className="flex items-center gap-6 text-xs">
-            <a href="#termos" className="hover:text-white transition-colors">Termos de Uso</a>
-            <a href="#privacidade" className="hover:text-white transition-colors">Privacidade</a>
             <a href="#contato" className="hover:text-white transition-colors">Suporte</a>
           </div>
         </div>

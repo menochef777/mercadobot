@@ -71,6 +71,62 @@ export default function GestorMercadoLandingPage() {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [dropdownOpen, setDropdownOpen] = useState(false);
 
+  // FormSubmit State
+  const [contactName, setContactName] = useState('');
+  const [contactEmail, setContactEmail] = useState('');
+  const [contactPhone, setContactPhone] = useState('');
+  const [contactMessage, setContactMessage] = useState('');
+  const [contactSubmitting, setContactSubmitting] = useState(false);
+  const [contactSuccess, setContactSuccess] = useState(false);
+  const [contactError, setContactError] = useState<string | null>(null);
+
+  const handleContactSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setContactSubmitting(true);
+    setContactError(null);
+    setContactSuccess(false);
+
+    try {
+      // Integração segura com FormSubmit via AJAX (Serverless / Sem servidor de email)
+      const targetEmail = import.meta.env.VITE_CONTACT_EMAIL || 'mercadobot.suporte@gmail.com';
+      const endpoint = `https://formsubmit.co/ajax/${targetEmail}`;
+
+      const res = await fetch(endpoint, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Accept': 'application/json',
+        },
+        body: JSON.stringify({
+          nome: contactName,
+          email: contactEmail,
+          whatsapp: contactPhone,
+          mensagem: contactMessage,
+          _subject: `Novo Contato via GestorMercado de ${contactName}`,
+          _template: 'table',
+          _captcha: 'false',
+          _honey: '', // Honeypot anti-spam
+        }),
+      });
+
+      const data = await res.json();
+      if (res.ok || data.success === 'true' || data.success === true) {
+        setContactSuccess(true);
+        setContactName('');
+        setContactEmail('');
+        setContactPhone('');
+        setContactMessage('');
+      } else {
+        setContactError(data.message || 'Erro ao enviar mensagem. Tente novamente.');
+      }
+    } catch (err) {
+      console.error('Erro ao enviar contato FormSubmit:', err);
+      setContactError('Não foi possível conectar ao serviço de envio. Verifique sua conexão.');
+    } finally {
+      setContactSubmitting(false);
+    }
+  };
+
   return (
     <div className="relative min-h-screen w-full bg-black text-white font-['Inter'] antialiased selection:bg-[#4ade80] selection:text-[#14532d] overflow-x-hidden">
       {/* ========================================================================= */}
@@ -172,12 +228,18 @@ export default function GestorMercadoLandingPage() {
               Depoimentos
             </a>
             <a
+              href="#contato"
+              className="transition-colors hover:text-[#4ade80] drop-shadow-sm"
+            >
+              Contato
+            </a>
+            <a
               href={`${API_BASE}/api-docs`}
               target="_blank"
               rel="noreferrer"
               className="transition-colors hover:text-[#4ade80] drop-shadow-sm"
             >
-              API Backend
+              API Docs
             </a>
           </nav>
 
@@ -508,7 +570,130 @@ export default function GestorMercadoLandingPage() {
       </section>
 
       {/* ========================================================================= */}
-      {/* 4. SEÇÃO DE CTA FINAL */}
+      {/* 4. SEÇÃO DE CONTATO E SUPORTE (INTEGRAÇÃO FORMSUBMIT) */}
+      {/* ========================================================================= */}
+      <section id="contato" className="relative z-20 w-full bg-[#0a0f0d] text-white py-20 px-6 md:px-[120px] border-t border-neutral-900">
+        <div className="max-w-4xl mx-auto">
+          <div className="text-center mb-12">
+            <div className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-[#14532d]/40 border border-[#4ade80]/30 text-[#4ade80] text-xs font-semibold uppercase tracking-wider mb-4">
+              ✉️ Fale com Nossos Especialistas
+            </div>
+            <h2 className="font-['Instrument_Serif'] text-3xl sm:text-5xl text-white mb-4">
+              Tire dúvidas ou solicite uma demonstração
+            </h2>
+            <p className="font-['Inter'] text-neutral-400 text-sm sm:text-base max-w-xl mx-auto">
+              Envie sua mensagem. Nosso time de atendimento entrará em contato direto com você para ajudar a impulsionar seu comércio.
+            </p>
+          </div>
+
+          <div className="p-8 sm:p-10 rounded-3xl bg-white/[0.03] border border-white/10 shadow-2xl backdrop-blur-xl">
+            {contactSuccess ? (
+              <div className="p-8 rounded-2xl bg-[#14532d]/50 border border-[#4ade80]/40 text-center flex flex-col items-center gap-3">
+                <div className="w-14 h-14 rounded-full bg-[#4ade80] text-[#14532d] flex items-center justify-center font-bold text-2xl shadow-lg shadow-[#4ade80]/20">
+                  ✓
+                </div>
+                <h3 className="font-['Manrope'] font-bold text-2xl text-white">
+                  Mensagem Enviada com Sucesso!
+                </h3>
+                <p className="font-['Inter'] text-sm text-neutral-300 max-w-md">
+                  Obrigado pelo contato! Recebemos suas informações com segurança e responderemos o mais breve possível pelo WhatsApp ou e-mail.
+                </p>
+                <button
+                  type="button"
+                  onClick={() => setContactSuccess(false)}
+                  className="mt-4 px-6 py-2.5 rounded-xl bg-white/10 hover:bg-white/20 text-white text-xs font-semibold transition-colors"
+                >
+                  Enviar outra mensagem
+                </button>
+              </div>
+            ) : (
+              <form onSubmit={handleContactSubmit} className="flex flex-col gap-5">
+                {contactError && (
+                  <div className="p-3.5 rounded-xl bg-red-950/80 border border-red-500/50 text-red-200 text-xs font-medium">
+                    ⚠️ {contactError}
+                  </div>
+                )}
+
+                {/* Honeypot invisível para proteção anti-spam */}
+                <input type="text" name="_honey" style={{ display: 'none' }} tabIndex={-1} autoComplete="off" />
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
+                  <div>
+                    <label className="block text-xs font-['Manrope'] font-semibold text-neutral-300 mb-1.5">
+                      Seu Nome Completo *
+                    </label>
+                    <input
+                      type="text"
+                      required
+                      placeholder="Ex: Márcio Silva"
+                      value={contactName}
+                      onChange={(e) => setContactName(e.target.value)}
+                      className="w-full px-4 py-3 rounded-xl bg-black/60 border border-white/15 text-white placeholder:text-neutral-600 focus:outline-none focus:border-[#4ade80] text-sm transition-colors"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-xs font-['Manrope'] font-semibold text-neutral-300 mb-1.5">
+                      WhatsApp ou Telefone *
+                    </label>
+                    <input
+                      type="tel"
+                      required
+                      placeholder="(81) 99999-9999"
+                      value={contactPhone}
+                      onChange={(e) => setContactPhone(e.target.value)}
+                      className="w-full px-4 py-3 rounded-xl bg-black/60 border border-white/15 text-white placeholder:text-neutral-600 focus:outline-none focus:border-[#4ade80] text-sm transition-colors"
+                    />
+                  </div>
+                </div>
+
+                <div>
+                  <label className="block text-xs font-['Manrope'] font-semibold text-neutral-300 mb-1.5">
+                    E-mail para Contato *
+                  </label>
+                  <input
+                    type="email"
+                    required
+                    placeholder="seu.email@exemplo.com"
+                    value={contactEmail}
+                    onChange={(e) => setContactEmail(e.target.value)}
+                    className="w-full px-4 py-3 rounded-xl bg-black/60 border border-white/15 text-white placeholder:text-neutral-600 focus:outline-none focus:border-[#4ade80] text-sm transition-colors"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-xs font-['Manrope'] font-semibold text-neutral-300 mb-1.5">
+                    Nome do Mercadinho ou Mensagem *
+                  </label>
+                  <textarea
+                    required
+                    rows={4}
+                    placeholder="Conte um pouco sobre o seu comércio ou as dúvidas que você tem..."
+                    value={contactMessage}
+                    onChange={(e) => setContactMessage(e.target.value)}
+                    className="w-full px-4 py-3 rounded-xl bg-black/60 border border-white/15 text-white placeholder:text-neutral-600 focus:outline-none focus:border-[#4ade80] text-sm transition-colors resize-none"
+                  />
+                </div>
+
+                <div className="flex items-center justify-between flex-wrap gap-4 mt-2">
+                  <span className="text-[11px] text-neutral-500 flex items-center gap-1.5">
+                    🔒 Envio seguro e protegido contra spam (FormSubmit SSL)
+                  </span>
+                  <button
+                    type="submit"
+                    disabled={contactSubmitting}
+                    className="font-['Cabin'] font-bold text-sm px-8 py-3.5 bg-[#4ade80] text-[#14532d] rounded-xl hover:bg-[#3ec972] transition-all duration-200 shadow-lg shadow-[#4ade80]/20 active:scale-95 disabled:opacity-50 cursor-pointer"
+                  >
+                    {contactSubmitting ? 'Enviando mensagem...' : 'Enviar Mensagem'}
+                  </button>
+                </div>
+              </form>
+            )}
+          </div>
+        </div>
+      </section>
+
+      {/* ========================================================================= */}
+      {/* 5. SEÇÃO DE CTA FINAL */}
       {/* ========================================================================= */}
       <section className="relative z-20 w-full bg-white text-gray-900 py-16 px-6 md:px-[120px]">
         <div className="max-w-7xl mx-auto">

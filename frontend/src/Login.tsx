@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 
 const API_BASE = import.meta.env.VITE_API_URL || 'http://127.0.0.1:3000';
 
@@ -23,8 +23,8 @@ interface LoginProps {
 }
 
 export default function Login({ onLoginSuccess }: LoginProps) {
-  const [email, setEmail] = useState('admin@example.com');
-  const [password, setPassword] = useState('admin123');
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -37,17 +37,15 @@ export default function Login({ onLoginSuccess }: LoginProps) {
       const res = await fetch(`${API_BASE}/login`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email, password }),
+        body: JSON.stringify({ email: email.trim(), password }),
       });
 
       if (!res.ok) {
-        let msg = 'Erro ao autenticar. Tente novamente.';
+        let msg = 'Erro ao autenticar. Verifique suas credenciais.';
         try {
-          const errText = await res.text();
-          if (errText) {
-            msg = errText.includes('password') || errText.includes('found') || res.status === 401
-              ? 'Email ou senha incorretos. Verifique as credenciais.'
-              : errText;
+          const errData = await res.json();
+          if (errData?.error) {
+            msg = errData.error;
           }
         } catch (e) {}
         setError(msg);
@@ -56,9 +54,13 @@ export default function Login({ onLoginSuccess }: LoginProps) {
       }
 
       const data = await res.json();
-      const token = data.accessToken || data.token || 'logged_in_token';
-      localStorage.setItem('gestormercado_token', token);
-      onLoginSuccess(token);
+      const token = data.accessToken || data.token;
+      if (token) {
+        localStorage.setItem('gestormercado_token', token);
+        onLoginSuccess(token);
+      } else {
+        setError('Token de autenticação não retornado pelo servidor.');
+      }
     } catch (err) {
       console.error('Erro na requisição de login:', err);
       setError('Não foi possível conectar ao servidor backend.');
@@ -122,9 +124,10 @@ export default function Login({ onLoginSuccess }: LoginProps) {
               <input
                 type="email"
                 required
-                placeholder="admin@example.com"
+                placeholder="seu.email@exemplo.com"
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
+                autoComplete="email"
                 className="w-full px-4 py-3 rounded-xl bg-black/60 border border-white/15 text-white placeholder:text-neutral-600 focus:outline-none focus:border-[#4ade80] text-sm transition-colors"
               />
             </div>
@@ -141,6 +144,7 @@ export default function Login({ onLoginSuccess }: LoginProps) {
                 placeholder="••••••••"
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
+                autoComplete="current-password"
                 className="w-full px-4 py-3 rounded-xl bg-black/60 border border-white/15 text-white placeholder:text-neutral-600 focus:outline-none focus:border-[#4ade80] text-sm transition-colors"
               />
             </div>
@@ -150,24 +154,15 @@ export default function Login({ onLoginSuccess }: LoginProps) {
               disabled={loading}
               className="w-full mt-2 py-3.5 rounded-xl bg-[#4ade80] text-[#14532d] font-['Cabin'] font-bold text-base hover:bg-[#3ec972] transition-all duration-200 shadow-xl shadow-[#4ade80]/20 active:scale-95 disabled:opacity-50 cursor-pointer text-center"
             >
-              {loading ? 'Entrando...' : 'Entrar no Dashboard'}
+              {loading ? 'Entrando com segurança...' : 'Entrar no Dashboard'}
             </button>
           </form>
-
-          {/* Caixa de Informação com Credenciais de Teste */}
-          <div className="p-3.5 rounded-xl bg-white/[0.02] border border-white/5 text-xs text-neutral-400 flex flex-col gap-1">
-            <span className="font-semibold text-neutral-300">🔑 Credenciais de Administrador (Seed):</span>
-            <div className="flex items-center justify-between text-[11px] font-mono mt-0.5">
-              <span>Email: <strong className="text-white">admin@example.com</strong></span>
-              <span>Senha: <strong className="text-white">admin123</strong></span>
-            </div>
-          </div>
         </div>
       </main>
 
       {/* Footer */}
       <footer className="w-full py-4 text-center text-xs text-neutral-600 relative z-10">
-        GestorMercado © 2026 — Sistema seguro de gestão de mercadinhos
+        GestorMercado © {new Date().getFullYear()} — Sistema seguro de gestão de mercadinhos
       </footer>
     </div>
   );
