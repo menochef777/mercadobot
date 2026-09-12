@@ -4,7 +4,8 @@
   "description": "",
   "main": "dist/server.js",
   "scripts": {
-    "build": "tsc",
+    "prisma:generate": "node -e \"process.env.DATABASE_URL = process.env.DATABASE_URL || 'postgresql://dummy:dummy@localhost:5432/dummy'; require('child_process').execSync('npx prisma generate', { stdio: 'inherit', env: process.env });\"",
+    "build": "npm run prisma:generate && tsc",
     "start": "node dist/server.js",
     "test": "vitest run --coverage",
     "dev": "tsx watch src/server.ts",
