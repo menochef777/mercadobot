@@ -1,5 +1,7 @@
 import React, { useState } from 'react';
 
+const API_BASE = import.meta.env.VITE_API_URL || 'http://localhost:3000';
+
 // Icons implemented as clean inline SVGs
 const StoreIcon = ({ className = "w-6 h-6" }: { className?: string }) => (
   <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
@@ -170,7 +172,7 @@ export default function GestorMercadoLandingPage() {
               Depoimentos
             </a>
             <a
-              href="http://localhost:3000/api-docs"
+              href={`${API_BASE}/api-docs`}
               target="_blank"
               rel="noreferrer"
               className="transition-colors hover:text-[#4ade80] drop-shadow-sm"
@@ -249,7 +251,9 @@ export default function GestorMercadoLandingPage() {
                 Como funciona
               </a>
               <a
-                href="http://localhost:3000/api-docs"
+                href={`${API_BASE}/api-docs`}
+                target="_blank"
+                rel="noreferrer"
                 onClick={() => setMobileMenuOpen(false)}
                 className="hover:text-[#4ade80] transition-colors"
               >

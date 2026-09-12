@@ -56,7 +56,7 @@ export default function Login({ onLoginSuccess }: LoginProps) {
       onLoginSuccess(token);
     } catch (err) {
       console.error('Erro na requisição de login:', err);
-      setError('Não foi possível conectar ao servidor backend (:3000).');
+      setError('Não foi possível conectar ao servidor backend.');
     } finally {
       setLoading(false);
     }
