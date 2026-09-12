@@ -32,13 +32,16 @@ app.post('/webhook', async (req: Request, res: Response): Promise<void> => {
       return;
     }
 
-    // Extrai o remetente (número do cliente/usuário)
-    const rawSender = (() => {
-      const de = payload.data?.de || messageData.from || '';
-      // Converte @lid para @c.us pegando só os números
-      const numero = String(de).replace('@lid', '').replace('@c.us', '').replace(/\D/g, '');
-      return numero ? `${numero}@c.us` : '';
-    })();
+    // Extrai o remetente (chatId / JID de onde veio a mensagem)
+    const rawSender =
+      payload.data?.chatId ||
+      messageData.chatId ||
+      payload.data?.de ||
+      messageData.from ||
+      payload.chatId ||
+      messageData.sender?.id ||
+      messageData.author ||
+      '';
     const senderNumber = formatarNumeroWhatsApp(String(rawSender));
 
     if (!senderNumber) {
@@ -52,6 +55,8 @@ app.post('/webhook', async (req: Request, res: Response): Promise<void> => {
       messageData.text ||
       messageData.content ||
       messageData.caption ||
+      payload.data?.corpo ||
+      payload.corpo ||
       ''
     ).trim();
     const textLower = textRaw.toLowerCase();

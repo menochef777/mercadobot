@@ -9,26 +9,30 @@ export interface EnviarMensagemResposta {
 }
 
 export function formatarNumeroWhatsApp(numero: string): string {
-  const limpo = numero.replace(/\D/g, '');
+  if (!numero) return '';
+  const trimmed = String(numero).trim();
+  // Se já for um JID válido do WhatsApp (@c.us, @lid, @g.us, @s.whatsapp.net), preserva intacto
+  if (trimmed.includes('@')) {
+    return trimmed;
+  }
+  const limpo = trimmed.replace(/\D/g, '');
   if (!limpo) return '';
   // Se for celular brasileiro com 10/11 dígitos e sem DDI 55
   if (limpo.length === 10 || limpo.length === 11) {
-    return `55${limpo}`;
+    return `${limpo.startsWith('55') ? limpo : '55' + limpo}@c.us`;
   }
-  return limpo;
+  return `${limpo}@c.us`;
 }
 
 export async function enviarMensagem(numero: string, texto: string): Promise<EnviarMensagemResposta> {
   const openwaUrl = (process.env.OPENWA_URL || 'http://localhost:2785').replace(/\/$/, '');
   const apiKey = process.env.OPENWA_API_KEY || 'sua-chave';
 
-  const numeroFormatado = formatarNumeroWhatsApp(numero);
-  if (!numeroFormatado) {
-    console.error('❌ [OpenWA] Número de telefone inválido para envio:', numero);
-    return { success: false, error: 'Número de telefone inválido' };
+  const chatId = formatarNumeroWhatsApp(numero);
+  if (!chatId) {
+    console.error('❌ [OpenWA] Destinatário/ChatId inválido para envio:', numero);
+    return { success: false, error: 'Número/ChatId inválido' };
   }
-
-  const chatId = numeroFormatado.includes('@') ? numeroFormatado : `${numeroFormatado}@c.us`;
 
   try {
     // Busca o UUID da sessão pelo nome
